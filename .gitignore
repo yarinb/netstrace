@@ -7,3 +7,6 @@ stamp-h1
 tags
 tests/Makefile
 *.o
+
+strace
+linux/ioctlent.h

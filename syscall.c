@@ -2704,13 +2704,22 @@ trace_syscall_entering(struct tcb *tcp)
 	tcp_last = tcp;
 	if (tcp->scno >= nsyscalls || tcp->scno < 0)
 		tprintf("syscall_%lu(", tcp->scno);
-	else
+	else {
+    /* yarinb - syscall name prefix print is here
+     * send(
+     * connect(
+     * recv(
+     * etc.
+     */
 		tprintf("%s(", sysent[tcp->scno].sys_name);
+  }
 	if (tcp->scno >= nsyscalls || tcp->scno < 0 ||
 	    ((qual_flags[tcp->scno] & QUAL_RAW) &&
 	     sysent[tcp->scno].sys_func != sys_exit))
 		sys_res = printargs(tcp);
 	else
+    /* yarinb - each syscall argument print function
+     * is called here */
 		sys_res = (*sysent[tcp->scno].sys_func)(tcp);
 	if (fflush(tcp->outf) == EOF)
 		return -1;

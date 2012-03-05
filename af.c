@@ -24,6 +24,7 @@
 
 #include "net-support.h"
 #include "netstat-util.h"
+#include "netstat_config.h"
 
 #define _(str) (str)
 

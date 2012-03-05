@@ -412,7 +412,7 @@ static int read_services(void)
 }
 
 
-char *get_sname(int socknumber, const char *proto, int numeric)
+const char *get_sname(int socknumber, const char *proto, int numeric)
 {
   static char buffer[64], init = 0;
   struct service *item;

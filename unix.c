@@ -79,7 +79,7 @@ struct aftype unix_aftype =
 {
     "unix", NULL, /*"UNIX Domain", */ AF_UNIX, 0,
     UNIX_print, UNIX_sprint, NULL, NULL,
-    NULL, NULL, NULL,
+    NULL,
     -1,
     "/proc/net/unix"
 };

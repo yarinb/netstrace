@@ -25,7 +25,7 @@ struct socket_info {
 
 /* This structure defines protocol families and their handlers. */
 struct aftype {
-    char *name;
+    const char *name;
     char *title;
     int af;
     int alen;
@@ -38,7 +38,7 @@ struct aftype {
     int (*getmask) (char *src, struct sockaddr * mask, char *name);
 
     int fd;
-    char *flag_file;
+    const char *flag_file;
 };
 
 extern struct aftype *aftypes[];
@@ -55,7 +55,7 @@ extern int INET6_rinput(int action, int flags, char **argv);
 extern int aftrans_opt(const char *arg);
 extern void aftrans_def(char *tool, char *argv0, char *dflt);
 
-extern char *get_sname(int socknumber, const char *proto, int numeric);
+extern const char *get_sname(int socknumber, const char *proto, int numeric);
 
 
 extern int flag_unx;
@@ -63,3 +63,4 @@ extern int flag_inet;
 extern int flag_inet6;
 
 extern char afname[];
+extern int get_tcp_info(unsigned long inode, struct socket_info *sock_info);

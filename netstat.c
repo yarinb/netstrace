@@ -11,9 +11,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 #include "net-support.h"
 #include "netstat-util.h"
+#include "netstat_config.h"
 
 /* yarinb - compat def for unsupported i18n 
  * no gettext() */
@@ -128,26 +130,26 @@ FILE *proc_fopen(const char *name)
 
 void prg_cache_add(pid_t pid, unsigned long inode, char *name)
 {
-    unsigned hi = PRG_HASHIT(inode);
-    struct prg_node **pnp,*pn;
+  unsigned hi = PRG_HASHIT(inode);
+  struct prg_node **pnp,*pn;
 
-    prg_cache_loaded=2;
-    for (pnp=prg_hash+hi;(pn=*pnp);pnp=&pn->next) {
-	if (pn->inode==inode) {
-	    /* Some warning should be appropriate here
-	       as we got multiple processes for one i-node */
-	    return;
-	}
+  prg_cache_loaded=2;
+  for (pnp=prg_hash+hi;(pn=*pnp);pnp=&pn->next) {
+    if (pn->inode==inode) {
+      /* Some warning should be appropriate here
+         as we got multiple processes for one i-node */
+      return;
     }
-    if (!(*pnp=malloc(sizeof(**pnp)))) 
-	return;
-    pn=*pnp;
-    pn->next=NULL;
-    pn->inode=inode;
-    pn->pid=pid;
-    if (strlen(name)>sizeof(pn->name)-1) 
-	name[sizeof(pn->name)-1]='\0';
-    strcpy(pn->name,name);
+  }
+  if (!(*pnp=malloc(sizeof(**pnp)))) 
+    return;
+  pn=*pnp;
+  pn->next=NULL;
+  pn->inode=inode;
+  pn->pid=pid;
+  if (strlen(name)>sizeof(pn->name)-1) 
+    name[sizeof(pn->name)-1]='\0';
+  strcpy(pn->name,name);
 }
 
 struct prg_node *_cache_get_prg(unsigned long inode)
@@ -156,8 +158,12 @@ struct prg_node *_cache_get_prg(unsigned long inode)
   struct prg_node *pn;
 
   for (pn=prg_hash[hi];pn;pn=pn->next)
-    if (pn->inode==inode)
+    if (pn->inode==inode) {
+#if DEBUG
+      printf("found matching pid for inode %d: [%d]", inode, pn->pid );
+#endif
       return(pn);
+    }
 
   return NULL;
 }
@@ -167,7 +173,7 @@ const char *prg_cache_get_name(unsigned long inode)
 
   struct prg_node *pn;
   pn = _cache_get_prg(inode);
-  if (pn != NULL)
+  if (pn == NULL)
     return("-");
 
   return pn->name;
@@ -178,7 +184,7 @@ pid_t prg_cache_get_pid(unsigned long inode)
 
   struct prg_node *pn;
   pn = _cache_get_prg(inode);
-  if (pn != NULL)
+  if (pn == NULL)
     return -1;
 
   return pn->pid;
@@ -396,8 +402,7 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
     fprintf(stderr, _("warning, got bogus tcp line.\n"));
     return 1;
   }
-  int af = (((struct sockaddr *) &localaddr)->sa_family);
-  if (af != AF_INET || af != AF_INET6) {
+    if ((ap = get_afntype(((struct sockaddr *) &localaddr)->sa_family)) == NULL) {
     fprintf(stderr, _("netstat: unsupported address family %d !\n"),
         ((struct sockaddr *) &localaddr)->sa_family);
     return 1;
@@ -405,7 +410,7 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
 
   safe_strncpy(local_addr, ap->sprint((struct sockaddr *) &localaddr, flag_not), sizeof(local_addr));
   safe_strncpy(rem_addr, ap->sprint((struct sockaddr *) &remaddr, flag_not), sizeof(rem_addr));
-  if (rem_port) {
+  if (/*rem_port*/1) {
     snprintf(buffer, sizeof(buffer), "%s", get_sname(htons(local_port), "tcp", flag_not & FLAG_NUM_PORT));
 
     /* yarinb - don't truncate ip addresses */
@@ -431,7 +436,8 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
     sock_info->inode = inode;
     sock_info->localaddr = &localaddr;
     sock_info->remaddr = &remaddr;
-    printf("%-4s  %-*s %-*s",
+    sock_info->pid = prg_cache_get_pid(inode);
+    printf("prefix: %-4s  %-*s %-*s\n",
         protname, netmax(23,strlen(local_addr)), local_addr, netmax(23,strlen(rem_addr)), rem_addr);
 
     return 0;
@@ -449,6 +455,8 @@ int get_tcp_info(unsigned long inode, struct socket_info *sock_info)
     perror(_PATH_PROCNET_TCP);
     return 1;
   }
+ }
+  
 
   do {
     if (fgets(buffer, sizeof(buffer), procinfo)) {
@@ -457,7 +465,6 @@ int get_tcp_info(unsigned long inode, struct socket_info *sock_info)
 
     }
   } while (!feof(procinfo));
- }
  fclose(procinfo);
 
  lnr = 0;
@@ -467,6 +474,7 @@ int get_tcp_info(unsigned long inode, struct socket_info *sock_info)
     perror(_PATH_PROCNET_TCP6);
     return 1;
   }
+ }
 
   do {
     if (fgets(buffer, sizeof(buffer), procinfo)) {
@@ -475,7 +483,6 @@ int get_tcp_info(unsigned long inode, struct socket_info *sock_info)
 
     }
   } while (!feof(procinfo));
- }
  fclose(procinfo);
 
  return -1;

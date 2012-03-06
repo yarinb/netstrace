@@ -31,18 +31,18 @@
 
 
 /* Display an UNSPEC address. */
-static char *UNSPEC_print(unsigned char *ptr)
+static char *UNSPEC_print(char *ptr)
 {
-    static char buff[64];
-    char *pos;
-    unsigned int i;
+  static char buff[64];
+  char *pos;
+  unsigned int i;
 
-    pos = buff;
-    for (i = 0; i < sizeof(struct sockaddr); i++) {
-	pos += sprintf(pos, "%02X-", (*ptr++ & 0377));
-    }
-    buff[strlen(buff) - 1] = '\0';
-    return (buff);
+  pos = buff;
+  for (i = 0; i < sizeof(struct sockaddr); i++) {
+    pos += sprintf(pos, "%02X-", (*ptr++ & 0377));
+  }
+  buff[strlen(buff) - 1] = '\0';
+  return (buff);
 }
 
 
@@ -58,9 +58,9 @@ static char *UNSPEC_sprint(struct sockaddr *sap, int numeric)
 
 
 /* Display a UNIX domain address. */
-static unsigned char *UNIX_print(unsigned char *ptr)
+static char *UNIX_print(unsigned char *ptr)
 {
-    return (ptr);
+    return (char *)(ptr);
 }
 
 
@@ -71,7 +71,7 @@ static char *UNIX_sprint(struct sockaddr *sap, int numeric)
 
     if (sap->sa_family == 0xFFFF || sap->sa_family == 0)
 	return safe_strncpy(buf, _("[NONE SET]"), sizeof(buf));
-    return (UNIX_print(sap->sa_data));
+    return sap->sa_data;
 }
 
 

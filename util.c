@@ -1775,4 +1775,5 @@ err:
 	return -1;
 }
 
+
 #endif /* SUNOS4 */

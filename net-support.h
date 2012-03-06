@@ -13,13 +13,11 @@
 struct socket_info {
 	pid_t pid;
 	int fd;
-#if HAVE_AFINET6
-  struct sockaddr_in6 *localaddr;
-  struct sockaddr_in6 *remaddr;
-#else
-  struct sockaddr_in *localaddr;
-  struct sockaddr_in *remaddr;
-#endif
+  char *laddress;     /* local socket address */
+  int lport;          /* local socket port */
+  char *raddress;     /* remote socket address */
+  int rport;          /* remote socket port */
+  int sa_family;
   unsigned long inode;
 };
 

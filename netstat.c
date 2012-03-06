@@ -160,7 +160,7 @@ struct prg_node *_cache_get_prg(unsigned long inode)
   for (pn=prg_hash[hi];pn;pn=pn->next)
     if (pn->inode==inode) {
 #if DEBUG
-      printf("found matching pid for inode %d: [%d]", inode, pn->pid );
+      printf("found matching pid for inode %lu: [%d]", inode, pn->pid );
 #endif
       return(pn);
     }
@@ -419,10 +419,12 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
         local_addr[22 - strlen(buffer)] = '\0';
     }
 
-    strcat(local_addr, ":");
-    strcat(local_addr, buffer);
-    snprintf(buffer, sizeof(buffer), "%s",
-        get_sname(htons(rem_port), "tcp", flag_not & FLAG_NUM_PORT));
+    sock_info->laddress = local_addr;
+    sock_info->lport = local_port;
+    /* strcat(local_addr, ":"); */
+    /* strcat(local_addr, buffer); */
+    /* snprintf(buffer, sizeof(buffer), "%s", */
+    /*     get_sname(htons(rem_port), "tcp", flag_not & FLAG_NUM_PORT)); */
 
     /* yarinb - don't truncate ip addresses */
     if (0) {
@@ -430,15 +432,16 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
         rem_addr[22 - strlen(buffer)] = '\0';
     }
 
-    strcat(rem_addr, ":");
-    strcat(rem_addr, buffer);
+    /* strcat(rem_addr, ":"); */
+    /* strcat(rem_addr, buffer); */
 
     sock_info->inode = inode;
-    sock_info->localaddr = &localaddr;
-    sock_info->remaddr = &remaddr;
+    sock_info->raddress = rem_addr;
+    sock_info->rport = rem_port;
     sock_info->pid = prg_cache_get_pid(inode);
-    printf("prefix: %-4s  %-*s %-*s\n",
-        protname, netmax(23,strlen(local_addr)), local_addr, netmax(23,strlen(rem_addr)), rem_addr);
+    sock_info->sa_family = ((struct sockaddr *)&localaddr)->sa_family;
+    printf("prefix: %-4s  %-*s:%d %-*s:%d\n",
+        protname, netmax(23,strlen(local_addr)), local_addr, local_port, netmax(23,strlen(rem_addr)), rem_addr, rem_port);
 
     return 0;
   }
@@ -449,6 +452,7 @@ int get_tcp_info(unsigned long inode, struct socket_info *sock_info)
  char buffer[8192];					
  int lnr = 0;						
 
+ prg_cache_load();
  procinfo = proc_fopen(_PATH_PROCNET_TCP);
  if (procinfo == NULL) {
   if (errno != ENOENT) {

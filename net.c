@@ -36,6 +36,10 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include "prg_cache.h"
+#include "netstat-util.h"
+#include "net-support.h"
+
 #if defined(HAVE_SIN6_SCOPE_ID_LINUX)
 #define in6_addr in6_addr_libc
 #define ipv6_mreq ipv6_mreq_libc
@@ -1196,6 +1200,59 @@ static const struct xlat af_packet_types[] = {
 #endif /* defined(AF_PACKET) */
 
 
+#define FD_NODE_HASH_SIZE 211
+#define PRIME 4723
+#define FD_NODE_HASHIT(x,y) ((((x) * PRIME) + ((y) * PRIME)) % FD_NODE_HASH_SIZE)
+
+static int fd_cache_loaded = 0;
+
+struct fd_node {
+  struct fd_node *next;
+  int fd;
+  pid_t pid;
+  struct socket_info *sockinfo;
+};
+
+static struct fd_node *fd_node_cache[FD_NODE_HASH_SIZE];
+
+struct fd_node *fd_cache_add(pid_t pid, int fd, struct socket_info *sockinfo)
+{
+  unsigned hi = FD_NODE_HASHIT(pid, fd);
+  struct fd_node **fdnp,*fdn;
+
+  for (fdnp=fd_node_cache+hi;(fdn=*fdnp);fdnp=&fdn->next) {
+    if (fdn->pid==pid && fdn->fd == fd) {
+      /* Some warning should be appropriate here
+         as we got multiple processes for one i-node */
+      return;
+    }
+  }
+  if (!(*fdnp=malloc(sizeof(**fdnp)))) 
+    return NULL;
+  fdn=*fdnp;
+  fdn->next=NULL;
+  fdn->fd=fd;
+  fdn->sockinfo = sockinfo;
+  fdn->pid=pid;
+
+  return fdn;
+}
+
+
+static struct fd_node *fd_cache_get(pid_t pid, int fd)
+{
+  unsigned hi = FD_NODE_HASHIT(pid, fd);
+  struct fd_node *fdn;
+
+  for (fdn=fd_node_cache[hi];fdn;fdn=fdn->next) {
+    if (fdn->pid==pid && fdn->fd==fd) {
+      return (fdn);
+    }
+  }
+
+  return NULL;
+}
+
 void
 printsock(struct tcb *tcp, long addr, int addrlen)
 {
@@ -1615,10 +1672,25 @@ int
 sys_send(tcp)
 struct tcb *tcp;
 {
-	if (entering(tcp)) {
-		tprintf("%ld, ", tcp->u_arg[0]);
-		printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
-		tprintf(", %lu, ", tcp->u_arg[2]);
+  struct fd_node *fd_node;
+  struct socket_info sockinfo;
+  if (entering(tcp)) {
+    unsigned long inode;
+    tprintf("%ld, ", tcp->u_arg[0]);
+    if ((fd_node = fd_cache_get(tcp->pid, (int) tcp->u_arg[0])) == NULL) {
+      if (resolve_inode(tcp->pid, tcp->u_arg[0], &inode) == 0) {
+        if (get_tcp_info(inode, &sockinfo) == 0) {
+          fd_node = fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
+        }
+      }
+    } 
+
+    if (fd_node != NULL && fd_node->sockinfo != NULL) {
+      tprintf(", remaddr=%s ", sockinfo.raddress);
+    }
+
+    printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
+    tprintf(", %lu, ", tcp->u_arg[2]);
 		/* flags */
 		printflags(msg_flags, tcp->u_arg[3], "MSG_???");
 	}

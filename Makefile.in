@@ -68,7 +68,7 @@ am_strace_OBJECTS = strace.$(OBJEXT) syscall.$(OBJEXT) count.$(OBJEXT) \
 	process.$(OBJEXT) bjm.$(OBJEXT) quota.$(OBJEXT) \
 	resource.$(OBJEXT) signal.$(OBJEXT) sock.$(OBJEXT) \
 	system.$(OBJEXT) term.$(OBJEXT) time.$(OBJEXT) proc.$(OBJEXT) \
-	scsi.$(OBJEXT) netstat-util.$(OBJEXT) af.$(OBJEXT) unix.$(OBJEXT) inet4.$(OBJEXT) inet6.$(OBJEXT) netstat.$(OBJEXT) stream.$(OBJEXT) block.$(OBJEXT)
+	scsi.$(OBJEXT) prg_cache.$(OBJEXT) netstat-util.$(OBJEXT) af.$(OBJEXT) unix.$(OBJEXT) inet4.$(OBJEXT) inet6.$(OBJEXT) netstat.$(OBJEXT) stream.$(OBJEXT) block.$(OBJEXT)
 strace_OBJECTS = $(am_strace_OBJECTS)
 strace_LDADD = $(LDADD)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;

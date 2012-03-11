@@ -606,7 +606,7 @@ printstr(struct tcb *tcp, long addr, int len)
 		outstr = malloc(4 * max_strlen + sizeof "\"...\"");
 	if (!str || !outstr) {
 		fprintf(stderr, "out of memory\n");
-		tprintf("%#lx", addr);
+		/* tprintf("%#lx", addr); */
 		return;
 	}
 
@@ -618,14 +618,14 @@ printstr(struct tcb *tcp, long addr, int len)
 		size = max_strlen + 1;
 		str[max_strlen] = '\0';
 		if (umovestr(tcp, addr, size, str) < 0) {
-			tprintf("%#lx", addr);
+			/* tprintf("%#lx", addr); */
 			return;
 		}
 	}
 	else {
 		size = MIN(len, max_strlen);
 		if (umoven(tcp, addr, size, str) < 0) {
-			tprintf("%#lx", addr);
+			/* tprintf("%#lx", addr); */
 			return;
 		}
 	}
@@ -634,7 +634,7 @@ printstr(struct tcb *tcp, long addr, int len)
 	    (len < 0 || len > max_strlen))
 		strcat(outstr, "...");
 
-	tprintf("%s", outstr);
+	tprintf(", content:%s", outstr);
 }
 
 #if HAVE_SYS_UIO_H

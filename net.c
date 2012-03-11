@@ -1253,6 +1253,33 @@ static struct fd_node *fd_cache_get(pid_t pid, int fd)
   return NULL;
 }
 
+
+struct sockaddr *getsockaddr(struct tcb *tcp, long addr, int addrlen)
+{
+	union {
+		char pad[128];
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+		struct sockaddr_un sau;
+	} addrbuf;
+	char string_addr[100];
+
+	if (addr == 0) {
+		return NULL;
+	}
+
+	if (addrlen < 2 || addrlen > sizeof(addrbuf))
+		addrlen = sizeof(addrbuf);
+
+	memset(&addrbuf, 0, sizeof(addrbuf));
+	if (umoven(tcp, addr, addrlen, addrbuf.pad) < 0) {
+		return NULL;
+	}
+	addrbuf.pad[sizeof(addrbuf.pad) - 1] = '\0';
+
+  return &addrbuf.sa;
+
+}
 void
 printsock(struct tcb *tcp, long addr, int addrlen)
 {
@@ -1601,7 +1628,30 @@ int
 sys_bind(tcp)
 struct tcb *tcp;
 {
+  struct aftype *ap;
+  struct sockaddr *sa;
+  struct in_addr inaddr;
+  struct sockaddr_in *sin;
+  struct sockaddr_in6 *sin6;
+  struct socket_info sockinfo;
+  static char name[80];
+
 	if (entering(tcp)) {
+
+		sa = getsockaddr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
+    if ((ap = get_afntype(sa->sa_family)) != NULL) {
+      /* tprintf("AFTYPE: %s ", ap->title); */
+      switch (ap->af) {
+        case AF_INET:
+          sin = ((struct sockaddr_in *)sa);
+          tprintf("REMOTE IP ADDRESS: %s ", inet_ntoa(sin->sin_addr));
+          break;
+        case AF_INET6:
+          sin6 = ((struct sockaddr_in6 *)sa);
+          tprintf("REMOTE IP ADDRESS: %s ", inet_ntop(AF_INET6, &sin6->sin6_addr, name,80));
+          break;
+      }
+    }
 		tprintf("%ld, ", tcp->u_arg[0]);
 		printsock(tcp, tcp->u_arg[1], tcp->u_arg[2]);
 		tprintf(", %lu", tcp->u_arg[2]);
@@ -1673,20 +1723,23 @@ sys_send(tcp)
 struct tcb *tcp;
 {
   struct fd_node *fd_node;
-  struct socket_info sockinfo;
+  struct socket_info sockinfo, *sockptr;
   if (entering(tcp)) {
     unsigned long inode;
     tprintf("%ld, ", tcp->u_arg[0]);
     if ((fd_node = fd_cache_get(tcp->pid, (int) tcp->u_arg[0])) == NULL) {
-      if (resolve_inode(tcp->pid, tcp->u_arg[0], &inode) == 0) {
-        if (get_tcp_info(inode, &sockinfo) == 0) {
-          fd_node = fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
+        if (resolve_inode(tcp->pid, tcp->u_arg[0], &inode) == 0) {
+          if (get_tcp_info(inode, &sockinfo) == 0) {
+            fd_node = fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
+          }
         }
-      }
-    } 
+    } else {
+      sockptr = &sockinfo;
+      memcpy(sockptr, fd_node->sockinfo, sizeof(fd_node->sockinfo));
+    }
 
     if (fd_node != NULL && fd_node->sockinfo != NULL) {
-      tprintf(", remaddr=%s ", sockinfo.raddress);
+      tprintf("remaddr=%s ", sockinfo.raddress);
     }
 
     printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);

@@ -84,6 +84,9 @@
 #include <sys/time.h>
 #include <errno.h>
 
+/* yarinb - add json support */
+#include <json.h>
+
 #ifdef HAVE_STDBOOL_H
 #include <stdbool.h>
 #endif

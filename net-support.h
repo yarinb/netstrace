@@ -13,9 +13,9 @@
 struct socket_info {
 	pid_t pid;
 	int fd;
-  char *laddress;     /* local socket address */
+  char laddress[128];     /* local socket address */
   int lport;          /* local socket port */
-  char *raddress;     /* remote socket address */
+  char raddress[128];     /* remote socket address */
   int rport;          /* remote socket port */
   int sa_family;
   unsigned long inode;

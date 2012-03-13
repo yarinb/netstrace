@@ -4,6 +4,7 @@ config.log
 config.status
 stamp-h1
 tags
+Makefile
 tests/Makefile
 *.o
 

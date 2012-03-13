@@ -432,6 +432,110 @@ unsigned long uid;
 
 static char path[MAXPATHLEN + 1];
 
+static int
+string_hexify(const char *instr, char *outstr, int len, int size)
+{
+	const unsigned char *ustr = (const unsigned char *) instr;
+	char *s = outstr;
+	int usehex = 0, c, i;
+
+	if (xflag > 1)
+		usehex = 1;
+	else if (xflag) {
+		/* Check for presence of symbol which require
+		   to hex-quote the whole string. */
+		for (i = 0; i < size; ++i) {
+			c = ustr[i];
+			/* Check for NUL-terminated string. */
+			if (len < 0) {
+				if (c == '\0')
+					break;
+				/* Quote at most size - 1 bytes. */
+				if (i == size - 1)
+					continue;
+			}
+			if (!isprint(c) && !isspace(c)) {
+				usehex = 1;
+				break;
+			}
+		}
+	}
+
+	/* *s++ = '\"'; */
+
+	if (usehex) {
+		/* Hex-quote the whole string. */
+		for (i = 0; i < size; ++i) {
+			c = ustr[i];
+			/* Check for NUL-terminated string. */
+			if (len < 0) {
+				if (c == '\0')
+					break;
+				/* Quote at most size - 1 bytes. */
+				if (i == size - 1)
+					continue;
+			}
+			sprintf(s, "\\x%02x", c);
+			s += 4;
+		}
+	} else {
+		for (i = 0; i < size; ++i) {
+			c = ustr[i];
+			/* Check for NUL-terminated string. */
+			if (len < 0) {
+				if (c == '\0')
+					break;
+				/* Quote at most size - 1 bytes. */
+				if (i == size - 1)
+					continue;
+			}
+			switch (c) {
+				case '\"': case '\\':
+					*s++ = '\\';
+					*s++ = c;
+					break;
+				case '\f':
+					*s++ = '\\';
+					*s++ = 'f';
+					break;
+				case '\n':
+					*s++ = '\\';
+					*s++ = 'n';
+					break;
+				case '\r':
+					*s++ = '\\';
+					*s++ = 'r';
+					break;
+				case '\t':
+					*s++ = '\\';
+					*s++ = 't';
+					break;
+				case '\v':
+					*s++ = '\\';
+					*s++ = 'v';
+					break;
+				default:
+					if (isprint(c))
+						*s++ = c;
+					else if (i + 1 < size
+						 && isdigit(ustr[i + 1])) {
+						sprintf(s, "\\%03o", c);
+						s += 4;
+					} else {
+						sprintf(s, "\\%o", c);
+						s += strlen(s);
+					}
+					break;
+			}
+		}
+	}
+
+	/* *s++ = '\"'; */
+	*s = '\0';
+
+	/* Return nonzero if the string was unterminated.  */
+	return i == size;
+}
 /*
  * Quote string `instr' of length `size'
  * Write up to (3 + `size' * 4) bytes to `outstr' buffer.
@@ -588,6 +692,54 @@ printpath(struct tcb *tcp, long addr)
  * If `len' < 0, treat the string as a NUL-terminated string.
  * If string length exceeds `max_strlen', append `...' to the output.
  */
+char *
+readstr(struct tcb *tcp, long addr, int len)
+{
+	static char *str = NULL;
+	static char *outstr;
+	int size;
+
+	if (!addr) {
+		tprintf("NULL");
+		return;
+	}
+	/* Allocate static buffers if they are not allocated yet. */
+	if (!str)
+		str = malloc(max_strlen + 1);
+	if (!outstr)
+		outstr = malloc(4 * max_strlen + sizeof "\"...\"");
+	if (!str || !outstr) {
+		fprintf(stderr, "out of memory\n");
+		/* tprintf("%#lx", addr); */
+		return;
+	}
+
+	if (len < 0) {
+		/*
+		 * Treat as a NUL-terminated string: fetch one byte more
+		 * because string_quote() quotes one byte less.
+		 */
+		size = max_strlen + 1;
+		str[max_strlen] = '\0';
+		if (umovestr(tcp, addr, size, str) < 0) {
+			/* tprintf("%#lx", addr); */
+			return;
+		}
+	}
+	else {
+		size = MIN(len, max_strlen);
+		if (umoven(tcp, addr, size, str) < 0) {
+			/* tprintf("%#lx", addr); */
+			return;
+		}
+	}
+
+	if (string_hexify(str, outstr, len, size) && (len < 0 || len > max_strlen))
+		strcat(outstr, "...");
+
+  return outstr;
+}
+
 void
 printstr(struct tcb *tcp, long addr, int len)
 {

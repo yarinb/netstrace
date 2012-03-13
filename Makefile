@@ -286,9 +286,6 @@ strace_SOURCES = strace.c syscall.c count.c util.c desc.c file.c ipc.c \
 		 resource.c signal.c sock.c system.c term.c time.c \
                 proc.c scsi.c stream.c block.c
 
-
-
-
 # yarinb - add libjsonc support - statically link the relevant
 # libjson .a files in the proper order, and then tell the linker to
 # switch back to dynamic linking for the rest of the libraries:
@@ -377,7 +374,8 @@ BUILT_SOURCES = $(am__append_1) $(am__append_2)
 ioctlent_h = $(builddir)/$(OS)/ioctlent.h
 CLEANFILES = $(ioctlent_h)
 ioctlent_h_deps = $(srcdir)/$(OS)/ioctlent.h.in $(srcdir)/$(OS)/$(ARCH)/ioctlent.h.in
-all: $(BUILT_SOURCES) config.h libjson-c
+all: $(BUILT_SOURCES) config.h 
+	#libjson-c
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
@@ -470,8 +468,6 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
-
-# yarinb - add libjson-c dependency
 strace$(EXEEXT): $(strace_OBJECTS) $(strace_DEPENDENCIES) 
 	@rm -f strace$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(strace_OBJECTS) $(strace_LDADD) $(LIBS) $(LIBJSON_LIBS)
@@ -1101,6 +1097,7 @@ $(ioctlent_h): $(top_builddir)/config.status $(ioctlent_h_deps)
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
+
 
 
 # yarinb add json-c 

@@ -1220,11 +1220,10 @@ struct fd_node *fd_cache_add(pid_t pid, int fd, struct socket_info *sockinfo)
   unsigned hi = FD_NODE_HASHIT(pid, fd);
   struct fd_node **fdnp,*fdn;
 
+  /* remove existing element... */
   for (fdnp=fd_node_cache+hi;(fdn=*fdnp);fdnp=&fdn->next) {
     if (fdn->pid==pid && fdn->fd == fd) {
-      /* Some warning should be appropriate here
-         as we got multiple processes for one i-node */
-      return;
+      free(*fdnp);
     }
   }
   if (!(*fdnp=malloc(sizeof(**fdnp)))) 
@@ -1232,7 +1231,8 @@ struct fd_node *fd_cache_add(pid_t pid, int fd, struct socket_info *sockinfo)
   fdn=*fdnp;
   fdn->next=NULL;
   fdn->fd=fd;
-  fdn->sockinfo = sockinfo;
+  fdn->sockinfo = (struct socket_info *) malloc(sizeof(struct socket_info));
+  memcpy(fdn->sockinfo, sockinfo, sizeof(*fdn->sockinfo));
   fdn->pid=pid;
 
   return fdn;
@@ -1254,18 +1254,35 @@ static struct fd_node *fd_cache_get(pid_t pid, int fd)
 }
 
 
-struct sockaddr *getsockaddr(struct tcb *tcp, long addr, int addrlen)
+void getsockaddr(struct tcb *tcp, long addr, int addrlen, struct sockaddr *sa)
 {
 	union {
 		char pad[128];
 		struct sockaddr sa;
 		struct sockaddr_in sin;
 		struct sockaddr_un sau;
+#ifdef HAVE_INET_NTOP
+		struct sockaddr_in6 sa6;
+#endif
+#if defined(LINUX) && defined(AF_IPX)
+		struct sockaddr_ipx sipx;
+#endif
+#ifdef AF_PACKET
+		struct sockaddr_ll ll;
+#endif
+#ifdef AF_NETLINK
+		struct sockaddr_nl nl;
+#endif
 	} addrbuf;
 	char string_addr[100];
 
 	if (addr == 0) {
-		return NULL;
+		tprintf("NULL");
+		return;
+	}
+	if (!verbose(tcp)) {
+		tprintf("%#lx", addr);
+		return;
 	}
 
 	if (addrlen < 2 || addrlen > sizeof(addrbuf))
@@ -1273,12 +1290,10 @@ struct sockaddr *getsockaddr(struct tcb *tcp, long addr, int addrlen)
 
 	memset(&addrbuf, 0, sizeof(addrbuf));
 	if (umoven(tcp, addr, addrlen, addrbuf.pad) < 0) {
-		return NULL;
+		return;
 	}
 	addrbuf.pad[sizeof(addrbuf.pad) - 1] = '\0';
-
-  return &addrbuf.sa;
-
+  memcpy(sa, &addrbuf.sa, sizeof(addrbuf.pad));
 }
 void
 printsock(struct tcb *tcp, long addr, int addrlen)
@@ -1636,25 +1651,44 @@ struct tcb *tcp;
   struct socket_info sockinfo;
   static char name[80];
 
+  sockinfo.raddress[0] = '\0';
+  sockinfo.laddress[0] = '\0';
+  sockinfo.rport = 0;
+  sockinfo.lport = 0;
+  int handle_call = 0;
 	if (entering(tcp)) {
-
-		sa = getsockaddr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
+    sa = (struct sockaddr *) malloc(128);
+		getsockaddr(tcp, tcp->u_arg[1], tcp->u_arg[2], sa);
     if ((ap = get_afntype(sa->sa_family)) != NULL) {
-      /* tprintf("AFTYPE: %s ", ap->title); */
+      sockinfo.pid = tcp->pid;
+      sockinfo.fd = (int) tcp->u_arg[0];
       switch (ap->af) {
         case AF_INET:
+          handle_call = 1;
           sin = ((struct sockaddr_in *)sa);
-          tprintf("REMOTE IP ADDRESS: %s ", inet_ntoa(sin->sin_addr));
+          strncpy(sockinfo.raddress, inet_ntoa(sin->sin_addr), 128);
+          sockinfo.rport = ntohs(sin->sin_port);
           break;
         case AF_INET6:
+          handle_call = 1;
           sin6 = ((struct sockaddr_in6 *)sa);
-          tprintf("REMOTE IP ADDRESS: %s ", inet_ntop(AF_INET6, &sin6->sin6_addr, name,80));
           break;
       }
+
     }
-		tprintf("%ld, ", tcp->u_arg[0]);
+    /* add to cache */
+    if (handle_call) {
+      /* printf("ADDING TO CACHE... %s\n", sockinfo.raddress); */
+      fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
+
+      /* append to json object */
+      append_to_json(tcp->json, &sockinfo);
+    }
+
+		/* tprintf("%ld, ", tcp->u_arg[0]); */
 		printsock(tcp, tcp->u_arg[1], tcp->u_arg[2]);
-		tprintf(", %lu", tcp->u_arg[2]);
+		/* tprintf(", %lu", tcp->u_arg[2]); */
+      printf("JSON: %s\n\n", json_object_to_json_string(tcp->json));
 	}
 	return 0;
 }
@@ -1723,29 +1757,33 @@ sys_send(tcp)
 struct tcb *tcp;
 {
   struct fd_node *fd_node;
-  struct socket_info sockinfo, *sockptr;
+  struct socket_info sockinfo;
   if (entering(tcp)) {
     unsigned long inode;
     tprintf("%ld, ", tcp->u_arg[0]);
     if ((fd_node = fd_cache_get(tcp->pid, (int) tcp->u_arg[0])) == NULL) {
         if (resolve_inode(tcp->pid, tcp->u_arg[0], &inode) == 0) {
           if (get_tcp_info(inode, &sockinfo) == 0) {
+            sockinfo.pid = tcp->pid;
             fd_node = fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
           }
         }
     } else {
-      sockptr = &sockinfo;
-      memcpy(sockptr, fd_node->sockinfo, sizeof(fd_node->sockinfo));
+      memcpy(&sockinfo, fd_node->sockinfo, sizeof(sockinfo));
     }
 
-    if (fd_node != NULL && fd_node->sockinfo != NULL) {
-      tprintf("remaddr=%s ", sockinfo.raddress);
+    if (fd_node != NULL) {
+      append_to_json(tcp->json, &sockinfo);
+      /* tprintf("remaddr=%s ", sockinfo.raddress); */
     }
 
+    json_object_object_add(tcp->json, "content",
+          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
     printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
-    tprintf(", %lu, ", tcp->u_arg[2]);
+    /* tprintf(", %lu, ", tcp->u_arg[2]); */
 		/* flags */
-		printflags(msg_flags, tcp->u_arg[3], "MSG_???");
+		/* printflags(msg_flags, tcp->u_arg[3], "MSG_???"); */
+    printf("JSON: %s\n", json_object_to_json_string(tcp->json));
 	}
 	return 0;
 }

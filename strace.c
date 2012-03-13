@@ -31,6 +31,7 @@
  */
 
 #include "defs.h"
+#include "net-support.h"
 
 #include <sys/types.h>
 #include <signal.h>
@@ -2262,15 +2263,14 @@ trace()
 			if (cflag != CFLAG_ONLY_STATS
 			    && (qual_flags[what] & QUAL_SIGNAL)) {
 				printleader(tcp);
-				tprintf("--- %s (%s) ---",
-					signame(what), strsignal(what));
-				printtrailer();
+				/* tprintf("--- %s (%s) ---", signame(what), strsignal(what)); */
+				/* printtrailer(); */
 #ifdef PR_INFO
 				if (tcp->status.PR_INFO.si_signo == what) {
-					printleader(tcp);
-					tprintf("    siginfo=");
-					printsiginfo(&tcp->status.PR_INFO, 1);
-					printtrailer();
+					/* printleader(tcp); */
+					/* tprintf("    siginfo="); */
+					/* printsiginfo(&tcp->status.PR_INFO, 1); */
+					/* printtrailer(); */
 				}
 #endif
 			}
@@ -2748,6 +2748,27 @@ Process %d attached (waiting for parent)\n",
 
 #include <stdarg.h>
 
+void append_to_json(struct json_object *json, struct socket_info *sockinfo)
+{
+
+
+  if (sockinfo->raddress != NULL && strlen(sockinfo->raddress) > 0) {
+    json_object_object_add(json,"remote_address",  
+        json_object_new_string(sockinfo->raddress));
+
+    json_object_object_add(json, "remote_port",  
+    json_object_new_int(sockinfo->rport));
+  }
+  if (sockinfo->laddress != NULL && strlen(sockinfo->laddress) > 0) {
+    json_object_object_add(json, "local_address",  
+      json_object_new_string(sockinfo->laddress));
+    json_object_object_add(json, "local_port",  
+      json_object_new_int(sockinfo->lport));
+  }
+
+  json_object_object_add(json, "pid", 
+      json_object_new_int(sockinfo->pid));
+}
 void
 tprintf(const char *fmt, ...)
 {

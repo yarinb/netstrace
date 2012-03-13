@@ -280,12 +280,18 @@ OS = @opsys@
 ARCH = @arch@
 ACLOCAL_AMFLAGS = -I m4
 AM_CFLAGS = $(WARN_CFLAGS)
-AM_CPPFLAGS = -I$(srcdir)/$(OS)/$(ARCH) -I$(srcdir)/$(OS) -I$(builddir)/$(OS)
+AM_CPPFLAGS = -I$(srcdir)/$(OS)/$(ARCH) -I$(srcdir)/$(OS) -I$(builddir)/$(OS) -Ijson-c-0.9/
 strace_SOURCES = strace.c syscall.c count.c util.c desc.c file.c ipc.c \
 		 io.c ioctl.c mem.c net.c process.c bjm.c quota.c \
 		 resource.c signal.c sock.c system.c term.c time.c \
                 proc.c scsi.c stream.c block.c
 
+# yarinb - add libjsonc support - statically link the relevant
+# libjson .a files in the proper order, and then tell the linker to
+# switch back to dynamic linking for the rest of the libraries:
+
+
+LIBJSON_LIBS = -Ljson-c-0.9/.libs/ -Wl,-Bstatic -ljson -Wl,-Bdynamic
 noinst_HEADERS = defs.h
 EXTRA_DIST = $(man_MANS) errnoent.sh signalent.sh syscallent.sh ioctlsort.c \
 	     debian/changelog debian/compat debian/control debian/copyright \
@@ -368,7 +374,7 @@ BUILT_SOURCES = $(am__append_1) $(am__append_2)
 @LINUX_TRUE@ioctlent_h = $(builddir)/$(OS)/ioctlent.h
 @LINUX_TRUE@CLEANFILES = $(ioctlent_h)
 @LINUX_TRUE@ioctlent_h_deps = $(srcdir)/$(OS)/ioctlent.h.in $(srcdir)/$(OS)/$(ARCH)/ioctlent.h.in
-all: $(BUILT_SOURCES) config.h
+all: $(BUILT_SOURCES) config.h libjson-c
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
@@ -463,7 +469,7 @@ clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 strace$(EXEEXT): $(strace_OBJECTS) $(strace_DEPENDENCIES) 
 	@rm -f strace$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(strace_OBJECTS) $(strace_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(strace_OBJECTS) $(strace_LDADD) $(LIBS) $(LIBJSON_LIBS)
 install-binSCRIPTS: $(bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
 	test -z "$(bindir)" || $(MKDIR_P) "$(DESTDIR)$(bindir)"
@@ -948,6 +954,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-recursive
+	rm -rf json-c-0.9
 
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
@@ -1089,3 +1096,12 @@ srpm: dist-xz
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
+
+
+
+# yarinb add json-c 
+libjson-c: json-c-extract
+	cd json-c-0.9 && ./configure && make
+
+json-c-extract:
+	tar -zxvf json-c-0.9.tar.gz

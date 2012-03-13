@@ -2422,23 +2422,25 @@ trace_syscall_exiting(struct tcb *tcp)
 	if (res == 1)
 		internal_syscall(tcp);
 
+
 	if (res == 1 && tcp->scno >= 0 && tcp->scno < nsyscalls &&
 	    !(qual_flags[tcp->scno] & QUAL_TRACE)) {
 		tcp->flags &= ~TCB_INSYSCALL;
+    json_object_put(tcp->json);
 		return 0;
 	}
 
-	if (tcp->flags & TCB_REPRINT) {
-		printleader(tcp);
-		tprintf("<... ");
-		if (scno_good != 1)
-			tprintf("????");
-		else if (tcp->scno >= nsyscalls || tcp->scno < 0)
-			tprintf("syscall_%lu", tcp->scno);
-		else
-			tprintf("%s", sysent[tcp->scno].sys_name);
-		tprintf(" resumed> ");
-	}
+	/* if (tcp->flags & TCB_REPRINT) { */
+	/* 	printleader(tcp); */
+	/* 	tprintf("<... "); */
+	/* 	if (scno_good != 1) */
+	/* 		tprintf("????"); */
+	/* 	else if (tcp->scno >= nsyscalls || tcp->scno < 0) */
+	/* 		tprintf("syscall_%lu", tcp->scno); */
+	/* 	else */
+	/* 		tprintf("%s", sysent[tcp->scno].sys_name); */
+	/* 	tprintf(" resumed> "); */
+	/* } */
 
 	if (cflag) {
 		struct timeval t = tv;
@@ -2446,6 +2448,7 @@ trace_syscall_exiting(struct tcb *tcp)
 		if (cflag == CFLAG_ONLY_STATS)
 		{
 			tcp->flags &= ~TCB_INSYSCALL;
+      json_object_put(tcp->json);
 			return rc;
 		}
 	}
@@ -2456,6 +2459,7 @@ trace_syscall_exiting(struct tcb *tcp)
 		tprintf("= ? <unavailable>");
 		printtrailer();
 		tcp->flags &= ~TCB_INSYSCALL;
+    json_object_put(tcp->json);
 		return res;
 	}
 
@@ -2463,8 +2467,10 @@ trace_syscall_exiting(struct tcb *tcp)
 	    || (qual_flags[tcp->scno] & QUAL_RAW))
 		sys_res = printargs(tcp);
 	else {
-		if (not_failing_only && tcp->u_error)
+		if (not_failing_only && tcp->u_error) {
+      json_object_put(tcp->json);
 			return 0;	/* ignore failed syscalls */
+    }
 		sys_res = (*sysent[tcp->scno].sys_func)(tcp);
 	}
 
@@ -2560,6 +2566,7 @@ trace_syscall_exiting(struct tcb *tcp)
 	if (fflush(tcp->outf) == EOF)
 		return -1;
 	tcp->flags &= ~TCB_INSYSCALL;
+  json_object_put(tcp->json);
 	return 0;
 }
 
@@ -2570,9 +2577,10 @@ trace_syscall_entering(struct tcb *tcp)
 	int res, scno_good;
 
 	scno_good = res = get_scno(tcp);
-	if (res == 0)
+  tcp->json = json_object_new_object();
+	if (res == 0) /* res == 0 is error */
 		return res;
-	if (res == 1)
+	if (res == 1) /* res == 1 is good */
 		res = syscall_fixup(tcp);
 	if (res == 0)
 		return res;
@@ -2585,12 +2593,13 @@ trace_syscall_entering(struct tcb *tcp)
 		printleader(tcp);
 		tcp->flags &= ~TCB_REPRINT;
 		tcp_last = tcp;
-		if (scno_good != 1)
-			tprintf("????" /* anti-trigraph gap */ "(");
-		else if (tcp->scno >= nsyscalls || tcp->scno < 0)
-			tprintf("syscall_%lu(", tcp->scno);
-		else
-			tprintf("%s(", sysent[tcp->scno].sys_name);
+		/* if (scno_good != 1) */
+			/* tprintf("????" /1* anti-trigraph gap *1/ "("); */
+		/* else if (tcp->scno >= nsyscalls || tcp->scno < 0) */
+			/* tprintf("syscall_%lu(", tcp->scno); */
+		/* else */
+			/* tprintf("%s(", sysent[tcp->scno].sys_name); */
+
 		/*
 		 * " <unavailable>" will be added later by the code which
 		 * detects ptrace errors.
@@ -2702,15 +2711,17 @@ trace_syscall_entering(struct tcb *tcp)
 	printleader(tcp);
 	tcp->flags &= ~TCB_REPRINT;
 	tcp_last = tcp;
-	if (tcp->scno >= nsyscalls || tcp->scno < 0)
-		tprintf("syscall_%lu(", tcp->scno);
-	else {
+	if (tcp->scno <= nsyscalls && tcp->scno > 0) {
     /* yarinb - syscall name prefix print is here
      * send(
      * connect(
      * recv(
      * etc.
      */
+    struct json_object *syscall_json;
+    syscall_json = json_object_new_string(sysent[tcp->scno].sys_name);
+    json_object_object_add(tcp->json, "syscall", syscall_json);
+   
 		tprintf("%s(", sysent[tcp->scno].sys_name);
   }
 	if (tcp->scno >= nsyscalls || tcp->scno < 0 ||

@@ -18,6 +18,7 @@ struct socket_info {
   char raddress[128];     /* remote socket address */
   int rport;          /* remote socket port */
   int sa_family;
+  char sun_path[108]; /* see sockaddr_un */
   unsigned long inode;
 };
 

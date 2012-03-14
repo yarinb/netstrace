@@ -1204,6 +1204,7 @@ static const struct xlat af_packet_types[] = {
 #define PRIME 4723
 #define FD_NODE_HASHIT(x,y) ((((x) * PRIME) + ((y) * PRIME)) % FD_NODE_HASH_SIZE)
 
+void append_to_json(struct json_object *json, struct socket_info *sockinfo);
 static int fd_cache_loaded = 0;
 
 struct fd_node {
@@ -1253,6 +1254,23 @@ static struct fd_node *fd_cache_get(pid_t pid, int fd)
   return NULL;
 }
 
+int get_socket_info(pid_t pid, int fd, struct socket_info *sockinfo)
+{
+    struct fd_node *fd_node;
+    unsigned long inode;
+    if ((fd_node = fd_cache_get(pid, fd)) == NULL) {
+        if (resolve_inode(pid, fd, &inode) == 0) {
+          if (get_tcp_info(inode, sockinfo) == 0) {
+            sockinfo->pid = pid;
+            fd_node = fd_cache_add(pid, fd, &sockinfo);
+          }
+        }
+    } else {
+      memcpy(&sockinfo, fd_node->sockinfo, sizeof(sockinfo));
+    }
+
+    return 0;
+}
 
 void getsockaddr(struct tcb *tcp, long addr, int addrlen, struct sockaddr *sa)
 {
@@ -1647,6 +1665,7 @@ struct tcb *tcp;
   struct sockaddr *sa;
   struct in_addr inaddr;
   struct sockaddr_in *sin;
+  struct sockaddr_un *sun;
   struct sockaddr_in6 *sin6;
   struct socket_info sockinfo;
   static char name[80];
@@ -1664,14 +1683,21 @@ struct tcb *tcp;
       sockinfo.fd = (int) tcp->u_arg[0];
       switch (ap->af) {
         case AF_INET:
+          sockinfo.sa_family = AF_INET;
           handle_call = 1;
           sin = ((struct sockaddr_in *)sa);
           strncpy(sockinfo.raddress, inet_ntoa(sin->sin_addr), 128);
           sockinfo.rport = ntohs(sin->sin_port);
           break;
         case AF_INET6:
+          sockinfo.sa_family = AF_INET6;
           handle_call = 1;
           sin6 = ((struct sockaddr_in6 *)sa);
+          break;
+        case AF_UNIX:
+          handle_call = 1;
+          strncpy(sockinfo.sun_path, sun->sun_path, 108 /* see sockaddr_un */); 
+          sockinfo.sa_family = AF_UNIX;
           break;
       }
 
@@ -1752,34 +1778,21 @@ sys_accept4(struct tcb *tcp)
 }
 #endif
 
+
 int
 sys_send(tcp)
 struct tcb *tcp;
 {
-  struct fd_node *fd_node;
   struct socket_info sockinfo;
   if (entering(tcp)) {
-    unsigned long inode;
-    tprintf("%ld, ", tcp->u_arg[0]);
-    if ((fd_node = fd_cache_get(tcp->pid, (int) tcp->u_arg[0])) == NULL) {
-        if (resolve_inode(tcp->pid, tcp->u_arg[0], &inode) == 0) {
-          if (get_tcp_info(inode, &sockinfo) == 0) {
-            sockinfo.pid = tcp->pid;
-            fd_node = fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
-          }
-        }
-    } else {
-      memcpy(&sockinfo, fd_node->sockinfo, sizeof(sockinfo));
-    }
 
-    if (fd_node != NULL) {
+    if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
       append_to_json(tcp->json, &sockinfo);
-      /* tprintf("remaddr=%s ", sockinfo.raddress); */
     }
 
     json_object_object_add(tcp->json, "content",
           json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
-    printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
+    /* printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]); */
     /* tprintf(", %lu, ", tcp->u_arg[2]); */
 		/* flags */
 		/* printflags(msg_flags, tcp->u_arg[3], "MSG_???"); */

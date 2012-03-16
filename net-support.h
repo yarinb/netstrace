@@ -1,4 +1,6 @@
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
 
 #define FLAG_EXT       3		/* AND-Mask */
 #define FLAG_NUM_HOST  4

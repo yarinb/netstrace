@@ -83,6 +83,13 @@ extern int optind;
 extern char *optarg;
 
 
+#define SERVER_PORT_DELIMITER ":"
+int server_connected = 0, send_json = 0;
+static int sockfd;
+static char *server_host = NULL;
+static char *server_port = NULL;
+static char *server_and_port = NULL;
+
 int debug = 0, followfork = 0;
 unsigned int ptrace_setoptions = 0;
 int dtime = 0, xflag = 0, qflag = 0;
@@ -171,7 +178,7 @@ int exitval;
 {
 	fprintf(ofp, "\
 usage: strace [-CdDffhiqrtttTvVxx] [-a column] [-e expr] ... [-o file]\n\
-              [-p pid] ... [-s strsize] [-u username] [-E var=val] ...\n\
+              [-p pid] ... [-s strsize] [-u username] [-E var=val] [-j server:port] ...\n\
               [command [arg ...]]\n\
    or: strace -c [-D] [-e expr] ... [-O overhead] [-S sortby] [-E var=val] ...\n\
               [command [arg ...]]\n\
@@ -197,6 +204,7 @@ usage: strace [-CdDffhiqrtttTvVxx] [-a column] [-e expr] ... [-o file]\n\
 -u username -- run command as username handling setuid and/or setgid\n\
 -E var=val -- put var=val in the environment for command\n\
 -E var -- remove var from the environment for command\n\
+-j server:port -- send raw JSON output to a TCP server\n\
 " /* this is broken, so don't document it
 -z -- print only succeeding syscalls\n\
   */
@@ -797,7 +805,7 @@ main(int argc, char *argv[])
 #ifndef USE_PROCFS
 		"D"
 #endif
-		"a:e:o:O:p:s:S:u:E:")) != EOF) {
+		"a:e:o:O:p:s:S:u:E:j:")) != EOF) {
 		switch (c) {
 		case 'c':
 			if (cflag == CFLAG_BOTH) {
@@ -909,6 +917,14 @@ main(int argc, char *argv[])
 				exit(1);
 			}
 			break;
+    case 'j':
+			server_and_port = strdup(optarg);
+      server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
+      server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);
+      printf("will send to %s:%s\n", server_host, server_port);
+      send_json = 1;
+      exit(1);
+      break;
 		default:
 			usage(stderr, 1);
 			break;
@@ -2769,6 +2785,60 @@ void append_to_json(struct json_object *json, struct socket_info *sockinfo)
   json_object_object_add(json, "pid", 
       json_object_new_int(sockinfo->pid));
 }
+
+int
+submit(struct json_object *json, struct sockaddr sock)
+{
+  return 0;
+}
+
+int server_connect(const char *host, int port)
+{
+  char port_str[8];
+  struct addrinfo hints, *servinfo, *p;
+  int rv;
+  /* char s[INET6_ADDRSTRLEN]; */
+
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  snprintf(port_str, 8, "%d", port);
+  if ((rv = getaddrinfo(host, port_str , &hints, &servinfo)) != 0) {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+    return 1;
+  }
+
+  // loop through all the results and connect to the first we can
+  for(p = servinfo; p != NULL; p = p->ai_next) {
+    if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+      perror("client: socket");
+      continue;
+    }
+
+    if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+      close(sockfd);
+      /* perror("client: connect"); */
+      continue;
+    }
+
+    break;
+  }
+
+  if (p == NULL) {
+    fprintf(stderr, "client: failed to connect\n");
+    server_connected = 0;
+    return 2;
+  }
+
+  /* inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), */
+  /*         s, sizeof s); */
+  /* printf("client: connecting to %s\n", s); */
+
+  freeaddrinfo(servinfo); // all done with this structure
+  server_connected = 1;
+  return 0;
+}
+
 void
 tprintf(const char *fmt, ...)
 {

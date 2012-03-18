@@ -175,7 +175,8 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
         local_addr[22 - strlen(buffer)] = '\0';
     }
 
-    sock_info->laddress = local_addr;
+    /* sock_info->laddress = local_addr; */
+		strncpy(sock_info->laddress, local_addr, sizeof(char) * strlen(local_addr) + 1);
     sock_info->lport = local_port;
     /* strcat(local_addr, ":"); */
     /* strcat(local_addr, buffer); */
@@ -192,7 +193,8 @@ static int tcp_do_one(int lnr, const char *line, unsigned long inode, struct soc
     /* strcat(rem_addr, buffer); */
 
     sock_info->inode = inode;
-    sock_info->raddress = rem_addr;
+    /* sock_info->raddress = rem_addr; */
+		strncpy(sock_info->raddress, rem_addr, sizeof(char) * strlen(rem_addr)+1);
     sock_info->rport = rem_port;
     sock_info->pid = prg_cache_get_pid(inode);
     sock_info->sa_family = ((struct sockaddr *)&localaddr)->sa_family;

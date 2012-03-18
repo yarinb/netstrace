@@ -104,14 +104,14 @@ int resolve_inode(pid_t pid, int fd, unsigned long *inode)
 		snprintf(fdfile, sizeof(fdfile), "/proc/%d/fd/%d", pid, fd);
 		lnamelen = readlink(fdfile, lname, sizeof(lname)-1);
 		if (lnamelen == -1) {
-			fprintf(stderr, "Failed to read link of %s\n", fdfile);
+			/* fprintf(stderr, "Failed to read link of %s\n", fdfile); */
 			return 1;
 		}
 		lname[lnamelen] = '\0';
 
 		if (extract_type_1_socket_inode(lname, inode) < 0)
 			if (extract_type_2_socket_inode(lname, inode) < 0) {
-				fprintf(stderr, "Failed to extract inode from %s\n", fdfile);
+				/* fprintf(stderr, "Failed to extract inode from %s\n", fdfile); */
 				return 1;
 			}
 

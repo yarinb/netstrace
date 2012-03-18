@@ -32,6 +32,10 @@
 
 #include "defs.h"
 
+#include "prg_cache.h"
+#include "netstat-util.h"
+#include "net-support.h"
+
 #include <fcntl.h>
 #if HAVE_SYS_UIO_H
 #include <sys/uio.h>
@@ -65,11 +69,25 @@ sys_read(struct tcb *tcp)
 int
 sys_write(struct tcb *tcp)
 {
+  struct socket_info sockinfo;
 	if (entering(tcp)) {
-		printfd(tcp, tcp->u_arg[0]);
-		tprintf(", ");
-		printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
-		tprintf(", %lu", tcp->u_arg[2]);
+    if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
+      append_to_json(tcp->json, &sockinfo);
+		} else {
+
+			json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
+		}
+			json_object_object_add(tcp->json, "fd",
+					json_object_new_int(tcp->u_arg[0]));
+
+    json_object_object_add(tcp->json, "content",
+          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+    printf("JSON: %s\n", json_object_to_json_string(tcp->json));
+		submit(tcp->json);
+		/* printfd(tcp, tcp->u_arg[0]); */
+		/* tprintf(", "); */
+		/* printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]); */
+		/* tprintf(", %lu", tcp->u_arg[2]); */
 	}
 	return 0;
 }

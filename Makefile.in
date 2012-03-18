@@ -62,7 +62,7 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_strace_OBJECTS = strace.$(OBJEXT) syscall.$(OBJEXT) count.$(OBJEXT) \
+am_strace_OBJECTS = json_queue.$(OBJEXT) strace.$(OBJEXT) syscall.$(OBJEXT) count.$(OBJEXT) \
 	util.$(OBJEXT) desc.$(OBJEXT) file.$(OBJEXT) ipc.$(OBJEXT) \
 	io.$(OBJEXT) ioctl.$(OBJEXT) mem.$(OBJEXT) net.$(OBJEXT) \
 	process.$(OBJEXT) bjm.$(OBJEXT) quota.$(OBJEXT) \
@@ -281,7 +281,7 @@ ARCH = @arch@
 ACLOCAL_AMFLAGS = -I m4
 AM_CFLAGS = $(WARN_CFLAGS)
 AM_CPPFLAGS = -I$(srcdir)/$(OS)/$(ARCH) -I$(srcdir)/$(OS) -I$(builddir)/$(OS) -Ijson-c-0.9/
-strace_SOURCES = strace.c syscall.c count.c util.c desc.c file.c ipc.c \
+strace_SOURCES = json_queue.c strace.c syscall.c count.c util.c desc.c file.c ipc.c \
 		 io.c ioctl.c mem.c net.c process.c bjm.c quota.c \
 		 resource.c signal.c sock.c system.c term.c time.c \
                 proc.c scsi.c stream.c block.c

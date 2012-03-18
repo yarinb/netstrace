@@ -86,6 +86,8 @@
 
 /* yarinb - add json support */
 #include <json.h>
+/* accesible submit function */
+extern int submit(struct json_object *json);
 
 #ifdef HAVE_STDBOOL_H
 #include <stdbool.h>
@@ -546,6 +548,7 @@ extern int upeek(struct tcb *, long, long *);
 extern void dumpiov(struct tcb *, int, long);
 extern void dumpstr(struct tcb *, long, int);
 extern void printstr(struct tcb *, long, int);
+extern char *readstr(struct tcb *, long, int);
 extern void printnum(struct tcb *, long, const char *);
 extern void printnum_int(struct tcb *, long, const char *);
 extern void printpath(struct tcb *, long);

@@ -1224,7 +1224,8 @@ struct fd_node *fd_cache_add(pid_t pid, int fd, struct socket_info *sockinfo)
   /* remove existing element... */
   for (fdnp=fd_node_cache+hi;(fdn=*fdnp);fdnp=&fdn->next) {
     if (fdn->pid==pid && fdn->fd == fd) {
-      free(*fdnp);
+  		memcpy(fdn->sockinfo, sockinfo, sizeof(*fdn->sockinfo));
+			return;
     }
   }
   if (!(*fdnp=malloc(sizeof(**fdnp)))) 
@@ -1259,14 +1260,17 @@ int get_socket_info(pid_t pid, int fd, struct socket_info *sockinfo)
     struct fd_node *fd_node;
     unsigned long inode;
     if ((fd_node = fd_cache_get(pid, fd)) == NULL) {
+			printf("Not in cache...\n");
         if (resolve_inode(pid, fd, &inode) == 0) {
           if (get_tcp_info(inode, sockinfo) == 0) {
             sockinfo->pid = pid;
             fd_node = fd_cache_add(pid, fd, &sockinfo);
           }
-        }
+        } else {
+					return 1;
+				}
     } else {
-      memcpy(&sockinfo, fd_node->sockinfo, sizeof(sockinfo));
+      memcpy(sockinfo, fd_node->sockinfo, sizeof(*sockinfo));
     }
 
     return 0;
@@ -1696,6 +1700,7 @@ struct tcb *tcp;
           break;
         case AF_UNIX:
           handle_call = 1;
+          sun = ((struct sockaddr_un *)sa);
           strncpy(sockinfo.sun_path, sun->sun_path, 108 /* see sockaddr_un */); 
           sockinfo.sa_family = AF_UNIX;
           break;
@@ -1714,7 +1719,9 @@ struct tcb *tcp;
 		/* tprintf("%ld, ", tcp->u_arg[0]); */
 		printsock(tcp, tcp->u_arg[1], tcp->u_arg[2]);
 		/* tprintf(", %lu", tcp->u_arg[2]); */
+
       printf("JSON: %s\n\n", json_object_to_json_string(tcp->json));
+			submit(tcp->json);
 	}
 	return 0;
 }
@@ -1842,16 +1849,28 @@ int
 sys_recv(tcp)
 struct tcb *tcp;
 {
+  struct socket_info sockinfo;
 	if (entering(tcp)) {
-		tprintf("%ld, ", tcp->u_arg[0]);
+		/* tprintf("%ld, ", tcp->u_arg[0]); */
+    if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
+      append_to_json(tcp->json, &sockinfo);
+		} else {
+			json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
+		}
 	} else {
-		if (syserror(tcp))
-			tprintf("%#lx", tcp->u_arg[1]);
-		else
-			printstr(tcp, tcp->u_arg[1], tcp->u_rval);
+		if (!syserror(tcp)) {
+			/* printstr(tcp, tcp->u_arg[1], tcp->u_rval); */
+			json_object_object_add(tcp->json, "fd",
+					json_object_new_int(tcp->u_arg[0]));
 
-		tprintf(", %lu, ", tcp->u_arg[2]);
-		printflags(msg_flags, tcp->u_arg[3], "MSG_???");
+    json_object_object_add(tcp->json, "content",
+          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+    printf("JSON: %s\n", json_object_to_json_string(tcp->json));
+		}
+
+		/* tprintf(", %lu, ", tcp->u_arg[2]); */
+		/* printflags(msg_flags, tcp->u_arg[3], "MSG_???"); */
+		submit(tcp->json);
 	}
 	return 0;
 }

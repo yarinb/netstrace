@@ -32,6 +32,7 @@
 
 #include "defs.h"
 #include "net-support.h"
+#include "json_queue.h"
 
 #include <sys/types.h>
 #include <signal.h>
@@ -84,11 +85,15 @@ extern char *optarg;
 
 
 #define SERVER_PORT_DELIMITER ":"
+#define FIRE_JSON_QUEUE_THRESHOLD 1
+#define CONNECT_TIMEOUT 3
+int server_connect(const char *host, const char *port);
 int server_connected = 0, send_json = 0;
 static int sockfd;
 static char *server_host = NULL;
 static char *server_port = NULL;
 static char *server_and_port = NULL;
+static struct json_list* json_queue;
 
 int debug = 0, followfork = 0;
 unsigned int ptrace_setoptions = 0;
@@ -779,6 +784,9 @@ main(int argc, char *argv[])
 
 	progname = argv[0] ? argv[0] : "strace";
 
+  /* initialize result queue */
+  json_queue = queue_create();
+
 	/* Allocate the initial tcbtab.  */
 	tcbtabsize = argc;	/* Surely enough for all -p args.  */
 	if ((tcbtab = calloc(tcbtabsize, sizeof tcbtab[0])) == NULL) {
@@ -921,9 +929,7 @@ main(int argc, char *argv[])
 			server_and_port = strdup(optarg);
       server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
       server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);
-      printf("will send to %s:%s\n", server_host, server_port);
       send_json = 1;
-      exit(1);
       break;
 		default:
 			usage(stderr, 1);
@@ -975,6 +981,10 @@ main(int argc, char *argv[])
 	}
 
 #ifdef LINUX
+    if ((sockfd = server_connect(server_host, server_port)) <= 0) {
+      perror("Failed connecting to server");
+      exit(127);
+    }
 	if (followfork) {
 		if (test_ptrace_setoptions() < 0) {
 			fprintf(stderr,
@@ -2766,8 +2776,6 @@ Process %d attached (waiting for parent)\n",
 
 void append_to_json(struct json_object *json, struct socket_info *sockinfo)
 {
-
-
   if (sockinfo->raddress != NULL && strlen(sockinfo->raddress) > 0) {
     json_object_object_add(json,"remote_address",  
         json_object_new_string(sockinfo->raddress));
@@ -2782,30 +2790,71 @@ void append_to_json(struct json_object *json, struct socket_info *sockinfo)
       json_object_new_int(sockinfo->lport));
   }
 
+  if (sockinfo->sa_family == AF_UNIX) {
+    json_object_object_add(json, "sa_family",  
+      json_object_new_string("AF_UNIX"));
+    json_object_object_add(json, "sun_path",  
+      json_object_new_string(sockinfo->sun_path));
+    
+  }
   json_object_object_add(json, "pid", 
       json_object_new_int(sockinfo->pid));
 }
 
-int
-submit(struct json_object *json, struct sockaddr sock)
+int send_queue(struct json_list *q)
 {
+  int c = 0, bytes_sent = 0;
+  const char *jsonstr;
+  struct json_node *node;
+  if (sockfd == 0) {
+    if ((sockfd = server_connect(server_host, server_port)) <= 0) {
+      tprintf("Failed connecting to server %s:%s\n", server_host, server_port);
+      return -1;
+    }
+  }
+  while (q->head) {
+    node = json_queue_pop(q);
+    jsonstr = json_object_to_json_string(node->json);
+    printf("Sending to server: %s\n", jsonstr);
+    bytes_sent = send(sockfd, jsonstr, strlen(jsonstr) + 1, 0);
+    if (bytes_sent == -1) {
+      perror("ERROR sending to server\n");
+      exit(127);
+    }
+    json_object_put(node->json);
+    /* free(node); */
+    c++;
+  } 
+
+  return c;
+}
+
+int
+submit(struct json_object *json)
+{
+  json_queue_push(json_queue, json);
+  if (json_queue_size(json_queue) >= FIRE_JSON_QUEUE_THRESHOLD) {
+    return send_queue(json_queue);
+  }
   return 0;
 }
 
-int server_connect(const char *host, int port)
+
+int server_connect(const char *host, const char *port)
 {
-  char port_str[8];
   struct addrinfo hints, *servinfo, *p;
   int rv;
+  struct timeval timeout;
+  timeout.tv_usec = 0;
+  timeout.tv_sec = CONNECT_TIMEOUT;
   /* char s[INET6_ADDRSTRLEN]; */
 
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
-  snprintf(port_str, 8, "%d", port);
-  if ((rv = getaddrinfo(host, port_str , &hints, &servinfo)) != 0) {
+  if ((rv = getaddrinfo(host, port , &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    return 1;
+    return -1;
   }
 
   // loop through all the results and connect to the first we can
@@ -2815,6 +2864,7 @@ int server_connect(const char *host, int port)
       continue;
     }
 
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&timeout, sizeof(timeout));
     if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
       close(sockfd);
       /* perror("client: connect"); */
@@ -2827,7 +2877,7 @@ int server_connect(const char *host, int port)
   if (p == NULL) {
     fprintf(stderr, "client: failed to connect\n");
     server_connected = 0;
-    return 2;
+    return -1;
   }
 
   /* inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), */
@@ -2836,7 +2886,7 @@ int server_connect(const char *host, int port)
 
   freeaddrinfo(servinfo); // all done with this structure
   server_connected = 1;
-  return 0;
+  return sockfd;
 }
 
 void

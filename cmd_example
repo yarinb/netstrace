@@ -1,0 +1,1 @@
+sudo ./strace -s 1024 -j localhost:51111 -t -xx -T -f -e close,connect,write,writev,read,send,recv,recvfrom $(pidof apache2 | sed 's/\([0-9]*\)/\-p \1/g')

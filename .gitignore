@@ -9,6 +9,7 @@ tests/Makefile
 *.o
 
 strace
+netstrace
 linux/ioctlent.h
 ttt
 json-c-0.9/

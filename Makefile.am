@@ -2,8 +2,8 @@
 
 SUBDIRS = tests
 
-bin_PROGRAMS = strace
-man_MANS = strace.1
+bin_PROGRAMS = netstrace
+man_MANS = netstrace.1
 bin_SCRIPTS = strace-graph
 
 # OS is one of `linux', `sunos4', `svr4', or `freebsd'.

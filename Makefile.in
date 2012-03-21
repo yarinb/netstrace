@@ -38,7 +38,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = strace$(EXEEXT)
+bin_PROGRAMS = netstrace$(EXEEXT)
 @LINUX_TRUE@@MAINTAINER_MODE_TRUE@am__append_1 = $(ioctlent_h_in)
 @LINUX_TRUE@am__append_2 = $(ioctlent_h)
 subdir = .
@@ -467,8 +467,8 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
-strace$(EXEEXT): $(strace_OBJECTS) $(strace_DEPENDENCIES) 
-	@rm -f strace$(EXEEXT)
+netstrace$(EXEEXT): $(strace_OBJECTS) $(strace_DEPENDENCIES) 
+	@rm -f netstrace$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(strace_OBJECTS) $(strace_LDADD) $(LIBS) $(LIBJSON_LIBS)
 install-binSCRIPTS: $(bin_SCRIPTS)
 	@$(NORMAL_INSTALL)

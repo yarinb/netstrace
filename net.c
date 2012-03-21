@@ -1720,7 +1720,6 @@ struct tcb *tcp;
 		printsock(tcp, tcp->u_arg[1], tcp->u_arg[2]);
 		/* tprintf(", %lu", tcp->u_arg[2]); */
 
-			submit(tcp->json);
 	}
 	return 0;
 }
@@ -1802,7 +1801,6 @@ struct tcb *tcp;
     /* tprintf(", %lu, ", tcp->u_arg[2]); */
 		/* flags */
 		/* printflags(msg_flags, tcp->u_arg[3], "MSG_???"); */
-    submit(tcp->json);
 	}
 	return 0;
 }
@@ -1868,7 +1866,6 @@ struct tcb *tcp;
 
 		/* tprintf(", %lu, ", tcp->u_arg[2]); */
 		/* printflags(msg_flags, tcp->u_arg[3], "MSG_???"); */
-		submit(tcp->json);
 	}
 	return 0;
 }

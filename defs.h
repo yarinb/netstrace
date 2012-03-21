@@ -86,6 +86,7 @@
 
 /* yarinb - add json support */
 #include <json.h>
+#include "net-support.h"
 /* accesible submit function */
 extern int submit(struct json_object *json);
 
@@ -527,6 +528,7 @@ extern void expand_tcbtab(void);
 
 #define alloctcb(pid)	alloc_tcb((pid), 1)
 
+extern void append_to_json(struct json_object *json, struct socket_info *sockinfo);
 extern void set_sortby(const char *);
 extern void set_overhead(int);
 extern void qualify(const char *);

@@ -1,3 +1,6 @@
+#ifndef _NET_SUPPORT_H_
+#define _NET_SUPPORT_H_
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -43,6 +46,7 @@ struct aftype {
 };
 
 extern struct aftype *aftypes[];
+extern int get_socket_info(pid_t pid, int fd, struct socket_info *sockinfo);
 
 extern struct aftype *get_aftype(const char *name);
 extern struct aftype *get_afntype(int type);
@@ -65,3 +69,5 @@ extern int flag_inet6;
 
 extern char afname[];
 extern int get_tcp_info(unsigned long inode, struct socket_info *sock_info);
+
+#endif

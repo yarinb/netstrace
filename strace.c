@@ -981,20 +981,23 @@ main(int argc, char *argv[])
 	}
 
 #ifdef LINUX
+
+  if (send_json) {
     if ((sockfd = server_connect(server_host, server_port)) <= 0) {
       perror("Failed connecting to server");
       exit(127);
     }
-	if (followfork) {
-		if (test_ptrace_setoptions() < 0) {
-			fprintf(stderr,
-				"Test for options supported by PTRACE_SETOPTIONS "
-				"failed, giving up using this feature.\n");
-			ptrace_setoptions = 0;
-		}
-		if (debug)
-			fprintf(stderr, "ptrace_setoptions = %#x\n",
-				ptrace_setoptions);
+  }
+  if (followfork) {
+    if (test_ptrace_setoptions() < 0) {
+      fprintf(stderr,
+          "Test for options supported by PTRACE_SETOPTIONS "
+          "failed, giving up using this feature.\n");
+      ptrace_setoptions = 0;
+    }
+    if (debug)
+      fprintf(stderr, "ptrace_setoptions = %#x\n",
+          ptrace_setoptions);
 	}
 #endif
 
@@ -2803,6 +2806,8 @@ void append_to_json(struct json_object *json, struct socket_info *sockinfo)
 
 int send_queue(struct json_list *q)
 {
+  if (!send_json) return 0;
+
   int c = 0, bytes_sent = 0;
   const char *jsonstr;
   struct json_node *node;
@@ -2816,12 +2821,15 @@ int send_queue(struct json_list *q)
     node = json_queue_pop(q);
     jsonstr = json_object_to_json_string(node->json);
     printf("Sending to server: %s\n", jsonstr);
-    bytes_sent = send(sockfd, jsonstr, strlen(jsonstr) + 1, 0);
+    char * s = malloc(snprintf(NULL, 0, "%s%s", jsonstr, "_EOJ_") + 1);
+    sprintf(s, "%s%s", jsonstr, "_EOJ_");
+    bytes_sent = send(sockfd, s, strlen(s), 0);
+    printf("Send %d bytes\n", bytes_sent);
     if (bytes_sent == -1) {
-      perror("ERROR sending to server\n");
+      fprintf(stderr,"Failed to send to server\n");
       exit(127);
     }
-    json_object_put(node->json);
+    /* json_object_put(node->json); */
     /* free(node); */
     c++;
   } 
@@ -2867,7 +2875,7 @@ int server_connect(const char *host, const char *port)
     setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&timeout, sizeof(timeout));
     if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
       close(sockfd);
-      /* perror("client: connect"); */
+      perror("client: connect");
       continue;
     }
 

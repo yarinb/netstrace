@@ -741,26 +741,31 @@ readstr(struct tcb *tcp, long addr, int len)
   return outstr;
 }
 
-void
+char *
 printstr(struct tcb *tcp, long addr, int len)
 {
 	static char *str = NULL;
 	static char *outstr;
+  static char *empty = NULL;
 	int size;
 
 	if (!addr) {
 		tprintf("NULL");
-		return;
+		return empty;
 	}
 	/* Allocate static buffers if they are not allocated yet. */
+  if (!empty) {
+    empty = malloc(1);
+    snprintf(empty, 1, "");
+  }
 	if (!str)
 		str = malloc(max_strlen + 1);
 	if (!outstr)
 		outstr = malloc(4 * max_strlen + sizeof "\"...\"");
 	if (!str || !outstr) {
 		fprintf(stderr, "out of memory\n");
-		/* tprintf("%#lx", addr); */
-		return;
+		tprintf("%#lx", addr);
+		return empty;
 	}
 
 	if (len < 0) {
@@ -771,15 +776,15 @@ printstr(struct tcb *tcp, long addr, int len)
 		size = max_strlen + 1;
 		str[max_strlen] = '\0';
 		if (umovestr(tcp, addr, size, str) < 0) {
-			/* tprintf("%#lx", addr); */
-			return;
+			tprintf("%#lx", addr);
+		return empty;
 		}
 	}
 	else {
 		size = MIN(len, max_strlen);
 		if (umoven(tcp, addr, size, str) < 0) {
-			/* tprintf("%#lx", addr); */
-			return;
+			tprintf("%#lx", addr);
+		return empty;
 		}
 	}
 
@@ -788,6 +793,7 @@ printstr(struct tcb *tcp, long addr, int len)
 		strcat(outstr, "...");
 
   tprintf("%s", outstr);
+  return outstr;
 }
 
 #if HAVE_SYS_UIO_H

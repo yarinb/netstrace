@@ -435,8 +435,9 @@ int
 sys_close(struct tcb *tcp)
 {
 	if (entering(tcp)) {
-		/* printfd(tcp, tcp->u_arg[0]); */
-    json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
+		printfd(tcp, tcp->u_arg[0]);
+    if (output_json)
+      json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
 	}
 	return 0;
 }

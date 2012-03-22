@@ -89,6 +89,7 @@ extern char *optarg;
 #define CONNECT_TIMEOUT 3
 int server_connect(const char *host, const char *port);
 int server_connected = 0, send_json = 0;
+int output_json = 0;
 static int sockfd;
 static char *server_host = NULL;
 static char *server_port = NULL;
@@ -926,10 +927,13 @@ main(int argc, char *argv[])
 			}
 			break;
     case 'j':
-			server_and_port = strdup(optarg);
-      server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
-      server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);
-      send_json = 1;
+      if (putenv(optarg) > 0) {
+        server_and_port = strdup(optarg);
+        server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
+        server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);
+        send_json = 1;
+      } 
+      output_json = 1;
       break;
 		default:
 			usage(stderr, 1);
@@ -2292,14 +2296,14 @@ trace()
 			if (cflag != CFLAG_ONLY_STATS
 			    && (qual_flags[what] & QUAL_SIGNAL)) {
 				printleader(tcp);
-				/* tprintf("--- %s (%s) ---", signame(what), strsignal(what)); */
-				/* printtrailer(); */
+				tprintf("--- %s (%s) ---", signame(what), strsignal(what));
+				printtrailer();
 #ifdef PR_INFO
 				if (tcp->status.PR_INFO.si_signo == what) {
-					/* printleader(tcp); */
-					/* tprintf("    siginfo="); */
-					/* printsiginfo(&tcp->status.PR_INFO, 1); */
-					/* printtrailer(); */
+					printleader(tcp);
+					tprintf("    siginfo=");
+					printsiginfo(&tcp->status.PR_INFO, 1);
+					printtrailer();
 				}
 #endif
 			}
@@ -2823,17 +2827,15 @@ int send_queue(struct json_list *q)
   while (q->head) {
     node = json_queue_pop(q);
     jsonstr = json_object_to_json_string(node->json);
-    printf("Sending to server: %s\n", jsonstr);
-    char * s = malloc(snprintf(NULL, 0, "%s%s", jsonstr, "_EOJ_") + 1);
-    sprintf(s, "%s%s", jsonstr, "_EOJ_");
+    /* printf("Sending to server: %s\n", jsonstr); */
+    char * s = malloc(snprintf(NULL, 0, "%s%s", jsonstr, "\n") + 1);
+    sprintf(s, "%s%s", jsonstr, "\n");
     bytes_sent = send(sockfd, s, strlen(s), 0);
-    printf("Send %d bytes\n", bytes_sent);
+    /* printf("Send %d bytes\n", bytes_sent); */
     if (bytes_sent == -1) {
       fprintf(stderr,"Failed to send to server\n");
       exit(127);
     }
-    /* json_object_put(node->json); */
-    /* free(node); */
     c++;
   } 
 
@@ -2900,10 +2902,36 @@ int server_connect(const char *host, const char *port)
   return sockfd;
 }
 
+
+void
+jprintf(const char *fmt, ...)
+{
+	va_list args;
+
+  if (!output_json)
+    return;
+
+	va_start(args, fmt);
+	if (outf) {
+		int n = vfprintf(outf, fmt, args);
+		if (n < 0) {
+			if (outf != stderr)
+				perror(outfname == NULL
+				       ? "<writing to pipe>" : outfname);
+		} else
+			curcol += n;
+	}
+	va_end(args);
+	return;
+}
+
 void
 tprintf(const char *fmt, ...)
 {
 	va_list args;
+
+  if (output_json)
+    return;
 
 	va_start(args, fmt);
 	if (outf) {
@@ -2923,6 +2951,7 @@ void
 printleader(tcp)
 struct tcb *tcp;
 {
+  char tv_duration_str[50];
 	if (tcp_last) {
 		if (tcp_last->ptrace_errno) {
 			if (tcp_last->flags & TCB_INSYSCALL) {
@@ -2954,18 +2983,26 @@ struct tcb *tcp;
 			tprintf("%6ld.%06ld ",
 				(long) dtv.tv_sec, (long) dtv.tv_usec);
 			otv = tv;
+      snprintf(tv_duration_str, sizeof(tv_duration_str), "%ld.%06ld", (long) dtv.tv_sec, (long) dtv.tv_usec);
+      json_object_object_add(tcp->json, "time", json_object_new_string(tv_duration_str));
 		}
-		else if (tflag > 2) {
-			tprintf("%ld.%06ld ",
-				(long) tv.tv_sec, (long) tv.tv_usec);
-		}
+    else if (tflag > 2) {
+      tprintf("%ld.%06ld ",
+          (long) tv.tv_sec, (long) tv.tv_usec);
+      snprintf(tv_duration_str, sizeof(tv_duration_str), "%ld.%06ld", (long) tv.tv_sec, (long) tv.tv_usec);
+      json_object_object_add(tcp->json, "time", json_object_new_string(tv_duration_str));
+    }
 		else {
 			time_t local = tv.tv_sec;
 			strftime(str, sizeof(str), "%T", localtime(&local));
-			if (tflag > 1)
+			if (tflag > 1) {
 				tprintf("%s.%06ld ", str, (long) tv.tv_usec);
-			else
+        snprintf(tv_duration_str, sizeof(tv_duration_str), "%s.%06ld", str, (long) tv.tv_usec);
+        json_object_object_add(tcp->json, "time", json_object_new_string(tv_duration_str));
+      } else {
 				tprintf("%s ", str);
+        json_object_object_add(tcp->json, "time", json_object_new_string(str));
+      }
 		}
 	}
 	if (iflag)

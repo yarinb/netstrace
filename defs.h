@@ -511,6 +511,7 @@ extern int *qual_flags;
 extern int debug, followfork;
 extern unsigned int ptrace_setoptions;
 extern int dtime, xflag, qflag;
+extern int output_json;
 extern cflag_t cflag;
 extern int acolumn;
 extern unsigned int nprocs, tcbtabsize;
@@ -549,7 +550,7 @@ extern int umovestr(struct tcb *, long, int, char *);
 extern int upeek(struct tcb *, long, long *);
 extern void dumpiov(struct tcb *, int, long);
 extern void dumpstr(struct tcb *, long, int);
-extern void printstr(struct tcb *, long, int);
+extern char *printstr(struct tcb *, long, int);
 extern char *readstr(struct tcb *, long, int);
 extern void printnum(struct tcb *, long, const char *);
 extern void printnum_int(struct tcb *, long, const char *);
@@ -633,6 +634,12 @@ extern int proc_open(struct tcb *tcp, int attaching);
 	printtv_bitness((tcp), (addr), BITNESS_CURRENT, 1)
 
 extern void tprintf(const char *fmt, ...)
+#ifdef __GNUC__
+	__attribute__ ((format (printf, 1, 2)))
+#endif
+	;
+
+extern void jprintf(const char *fmt, ...)
 #ifdef __GNUC__
 	__attribute__ ((format (printf, 1, 2)))
 #endif

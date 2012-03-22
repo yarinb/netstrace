@@ -2456,7 +2456,7 @@ trace_syscall_exiting(struct tcb *tcp)
 	}
 
 	if (res != 1) {
-		/* tprintf(") "); */
+		tprintf(") ");
 		tabto(acolumn);
 		tprintf("= ? <unavailable>");
 		printtrailer();
@@ -2477,15 +2477,15 @@ trace_syscall_exiting(struct tcb *tcp)
 	}
 
 	u_error = tcp->u_error;
-	/* tprintf(") "); */
+	tprintf(") ");
 	tabto(acolumn);
 	if (tcp->scno >= nsyscalls || tcp->scno < 0 ||
 	    qual_flags[tcp->scno] & QUAL_RAW) {
 		if (u_error) {
-			/* tprintf("= -1 (errno %ld)", u_error); strncpy(retval_str,  "-1", 3); */
+			tprintf("= -1 (errno %ld)", u_error); strncpy(retval_str,  "-1", 3);
     }
 		else {
-			/* tprintf("= %#lx", tcp->u_rval); */
+			tprintf("= %#lx", tcp->u_rval);
       sprintf(retval_str, "%#lx", tcp->u_rval);
     }
 
@@ -2507,7 +2507,7 @@ trace_syscall_exiting(struct tcb *tcp)
 			break;
 #endif /* LINUX */
 		default:
-			/* tprintf("= -1 "); */
+			tprintf("= -1 ");
       strncpy(retval_str,  "-1", 3);
 			if (u_error < 0)
 				tprintf("E??? (errno %ld)", u_error);
@@ -2522,46 +2522,46 @@ trace_syscall_exiting(struct tcb *tcp)
 	}
 	else {
 		if (sys_res & RVAL_NONE) { 
-			/* tprintf("= ?"); */
+			tprintf("= ?");
       strncpy(retval_str,  "?", 2);
     } else {
 			switch (sys_res & RVAL_MASK) {
 			case RVAL_HEX:
-				/* tprintf("= %#lx", tcp->u_rval); */
+				tprintf("= %#lx", tcp->u_rval);
         sprintf(retval_str, "%#lx", tcp->u_rval);
 				break;
 			case RVAL_OCTAL:
-				/* tprintf("= %#lo", tcp->u_rval); */
+				tprintf("= %#lo", tcp->u_rval);
         sprintf(retval_str, "%#lo", tcp->u_rval);
 				break;
 			case RVAL_UDECIMAL:
-				/* tprintf("= %lu", tcp->u_rval); */
+				tprintf("= %lu", tcp->u_rval);
         sprintf(retval_str, "%lu", tcp->u_rval);
 				break;
 			case RVAL_DECIMAL:
-				/* tprintf("= %ld", tcp->u_rval); */
+				tprintf("= %ld", tcp->u_rval);
         sprintf(retval_str, "%ld", tcp->u_rval);
 				break;
 #ifdef HAVE_LONG_LONG
 			case RVAL_LHEX:
-				/* tprintf("= %#llx", tcp->u_lrval); */
+				tprintf("= %#llx", tcp->u_lrval);
         sprintf(retval_str, "%#llx", tcp->u_lrval);
 				break;
 			case RVAL_LOCTAL:
-				/* tprintf("= %#llo", tcp->u_lrval); */
+				tprintf("= %#llo", tcp->u_lrval);
         sprintf(retval_str, "%#llo", tcp->u_lrval);
 				break;
 			case RVAL_LUDECIMAL:
-				/* tprintf("= %llu", tcp->u_lrval); */
+				tprintf("= %llu", tcp->u_lrval);
         sprintf(retval_str, "%llu", tcp->u_lrval);
 				break;
 			case RVAL_LDECIMAL:
-				/* tprintf("= %lld", tcp->u_lrval); */
+				tprintf("= %lld", tcp->u_lrval);
         sprintf(retval_str, "%lld", tcp->u_lrval);
 				break;
 #endif
 			default:
-				/* fprintf(stderr, "invalid rval format\n"); */
+				fprintf(stderr, "invalid rval format\n");
 				break;
 			}
 		}
@@ -2582,8 +2582,10 @@ trace_syscall_exiting(struct tcb *tcp)
     json_object_object_add(tcp->json, "duration", json_object_new_string(tv_duration_str));
   }
 
-  printf("JSON: %s\n", json_object_to_json_string(tcp->json));
-  /* printtrailer(); */
+  if (output_json) {
+    jprintf("%s\n", json_object_to_json_string(tcp->json));
+  }
+  printtrailer();
 
   dumpio(tcp);
   if (fflush(tcp->outf) == EOF)
@@ -2601,19 +2603,10 @@ trace_syscall_entering(struct tcb *tcp)
 {
 	int sys_res;
 	int res, scno_good;
-  char tv_duration_str[50];
-	static struct timeval tv;
 
 	scno_good = res = get_scno(tcp);
   tcp->json = json_object_new_object();
 
-	gettimeofday(&tv, NULL);
-
-    /* yarinb - add syscall duration to json */
-    snprintf(tv_duration_str, sizeof(tv_duration_str), 
-        "%ld.%06ld", (long) tv.tv_sec, (long) tv.tv_usec);
-
-    json_object_object_add(tcp->json, "time", json_object_new_string(tv_duration_str));
 
 	if (res == 0) /* res == 0 is error */
 		return res;
@@ -2630,12 +2623,12 @@ trace_syscall_entering(struct tcb *tcp)
 		printleader(tcp);
 		tcp->flags &= ~TCB_REPRINT;
 		tcp_last = tcp;
-		/* if (scno_good != 1) */
-			/* tprintf("????" /1* anti-trigraph gap *1/ "("); */
-		/* else if (tcp->scno >= nsyscalls || tcp->scno < 0) */
-			/* tprintf("syscall_%lu(", tcp->scno); */
-		/* else */
-			/* tprintf("%s(", sysent[tcp->scno].sys_name); */
+		if (scno_good != 1)
+			tprintf("????" /* anti-trigraph gap */ "(");
+		else if (tcp->scno >= nsyscalls || tcp->scno < 0)
+			tprintf("syscall_%lu(", tcp->scno);
+		else
+			tprintf("%s(", sysent[tcp->scno].sys_name);
 
 		/*
 		 * " <unavailable>" will be added later by the code which

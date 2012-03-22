@@ -55,21 +55,26 @@ sys_read(struct tcb *tcp)
 {
   struct socket_info sockinfo;
   if (entering(tcp)) {
-    /* printfd(tcp, tcp->u_arg[0]); */
-    /* tprintf(", "); */
-    if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
-      append_to_json(tcp->json, &sockinfo);
-    } else {
-      json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
+    printfd(tcp, tcp->u_arg[0]);
+    tprintf(", ");
+    if (output_json) {
+      if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
+        append_to_json(tcp->json, &sockinfo);
+      } else {
+        json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
+      }
     }
   } else {
-    if (!syserror(tcp)) {
-      /* printstr(tcp, tcp->u_arg[1], tcp->u_rval); */
+    if (syserror(tcp)) {
+      	tprintf("%#lx", tcp->u_arg[1]);
+    } else {
+      printstr(tcp, tcp->u_arg[1], tcp->u_rval);
       json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
 
       json_object_object_add(tcp->json, "content",
           json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
     }
+    tprintf(", %lu", tcp->u_arg[2]);
   }
   return 0;
 }
@@ -89,10 +94,10 @@ sys_write(struct tcb *tcp)
 
     json_object_object_add(tcp->json, "content",
           json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
-		/* printfd(tcp, tcp->u_arg[0]); */
-		/* tprintf(", "); */
-		/* printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]); */
-		/* tprintf(", %lu", tcp->u_arg[2]); */
+		printfd(tcp, tcp->u_arg[0]);
+		tprintf(", ");
+		printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
+		tprintf(", %lu", tcp->u_arg[2]);
 	}
 	return 0;
 }
@@ -274,21 +279,25 @@ sys_readv(struct tcb *tcp)
       json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
     }
   } else {
-    if (!syserror(tcp)) {
-      /* tprintf("%#lx, %lu", tcp->u_arg[1], tcp->u_arg[2]); */
-      /* return 0; */
-      size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
-      for (i = 0; i< size; i++) {
-        json_object_object_add(tcp->json, "fd",
-            json_object_new_int(tcp->u_arg[0]));
+    if (syserror(tcp)) {
+      tprintf("%#lx, %lu", tcp->u_arg[1], tcp->u_arg[2]);
+      return 0;
+    } else {
+      tprint_iov(tcp, tcp->u_arg[2], tcp->u_arg[1]);
+      if (output_json) {
+        size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
+        for (i = 0; i< size; i++) {
+          json_object_object_add(tcp->json, "fd",
+              json_object_new_int(tcp->u_arg[0]));
 
-        json_object_object_add(tcp->json, "content",
-            json_object_new_string(strings[i]));
-        free(strings[i]);
+          json_object_object_add(tcp->json, "content",
+              json_object_new_string(strings[i]));
+          free(strings[i]);
+        }
       }
     }
-    /* tprint_iov(tcp, tcp->u_arg[2], tcp->u_arg[1]); */
-    /* tprintf(", %lu", tcp->u_arg[2]); */
+    tprint_iov(tcp, tcp->u_arg[2], tcp->u_arg[1]);
+    tprintf(", %lu", tcp->u_arg[2]);
   }
   return 0;
 }
@@ -300,30 +309,29 @@ sys_writev(struct tcb *tcp)
   char *strings[100];
   int i;
   int size;
-  /* printfd(tcp, tcp->u_arg[0]); */
-  /* tprintf(", "); */
-  /* printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]); */
-  /* tprintf(", %lu", tcp->u_arg[2]); */
   if (entering(tcp)) {
-    /* printfd(tcp, tcp->u_arg[0]); */
-    /* tprintf(", "); */
+    printfd(tcp, tcp->u_arg[0]);
+    tprintf(", ");
+    tprint_iov(tcp, tcp->u_arg[2], tcp->u_arg[1]);
+    tprintf(", %lu", tcp->u_arg[2]);
+    if (output_json) {
+      if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
+        append_to_json(tcp->json, &sockinfo);
+      } else {
 
-    if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
-      append_to_json(tcp->json, &sockinfo);
-    } else {
+        json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
+      }
+      size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
+      for (i = 0; i< size; i++) {
+        json_object_object_add(tcp->json, "fd",
+            json_object_new_int(tcp->u_arg[0]));
 
-      json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
+        json_object_object_add(tcp->json, "content",
+            json_object_new_string(strings[i]));
+        free(strings[i]);
+      }
     }
-    size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
-    for (i = 0; i< size; i++) {
-      json_object_object_add(tcp->json, "fd",
-          json_object_new_int(tcp->u_arg[0]));
-
-      json_object_object_add(tcp->json, "content",
-          json_object_new_string(strings[i]));
-      free(strings[i]);
-    }
-    /* tprintf(", %lu", tcp->u_arg[2]); */
+    tprintf(", %lu", tcp->u_arg[2]);
   }
   return 0;
 }

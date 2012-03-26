@@ -1787,7 +1787,7 @@ struct tcb *tcp;
 {
   struct socket_info sockinfo;
   if (entering(tcp)) {
-
+		tprintf("%ld, ", tcp->u_arg[0]);
     if (output_json) {
       if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
         append_to_json(tcp->json, &sockinfo);

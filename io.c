@@ -68,11 +68,14 @@ sys_read(struct tcb *tcp)
     if (syserror(tcp)) {
       	tprintf("%#lx", tcp->u_arg[1]);
     } else {
-      printstr(tcp, tcp->u_arg[1], tcp->u_rval);
-      json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
+      if (output_json) {
+        json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
 
-      json_object_object_add(tcp->json, "content",
-          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+        json_object_object_add(tcp->json, "content",
+            json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+      } else {
+        printstr(tcp, tcp->u_arg[1], tcp->u_rval);
+      }
     }
     tprintf(", %lu", tcp->u_arg[2]);
   }

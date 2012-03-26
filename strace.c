@@ -783,7 +783,7 @@ main(int argc, char *argv[])
 
 	static char buf[BUFSIZ];
 
-	progname = argv[0] ? argv[0] : "strace";
+	progname = argv[0] ? argv[0] : "netstrace";
 
   /* initialize result queue */
   json_queue = queue_create();
@@ -814,7 +814,7 @@ main(int argc, char *argv[])
 #ifndef USE_PROCFS
 		"D"
 #endif
-		"a:e:o:O:p:s:S:u:E:j:")) != EOF) {
+		"a:e:o:O:p:s:S:u:E:j::")) != EOF) {
 		switch (c) {
 		case 'c':
 			if (cflag == CFLAG_BOTH) {
@@ -927,7 +927,7 @@ main(int argc, char *argv[])
 			}
 			break;
     case 'j':
-      if (putenv(optarg) > 0) {
+      if (optarg) {
         server_and_port = strdup(optarg);
         server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
         server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);

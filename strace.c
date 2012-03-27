@@ -211,6 +211,7 @@ usage: strace [-CdDffhiqrtttTvVxx] [-a column] [-e expr] ... [-o file]\n\
 -E var=val -- put var=val in the environment for command\n\
 -E var -- remove var from the environment for command\n\
 -j server:port -- send raw JSON output to a TCP server\n\
+-J print raw JSON output\n\
 " /* this is broken, so don't document it
 -z -- print only succeeding syscalls\n\
   */
@@ -810,11 +811,11 @@ main(int argc, char *argv[])
 	qualify("verbose=all");
 	qualify("signal=all");
 	while ((c = getopt(argc, argv,
-		"+cCdfFhiqrtTvVxz"
+		"+cCdfFhiqrtTvVxzJ"
 #ifndef USE_PROCFS
 		"D"
 #endif
-		"a:e:o:O:p:s:S:u:E:j::")) != EOF) {
+		"a:e:o:O:p:s:S:u:E:j:")) != EOF) {
 		switch (c) {
 		case 'c':
 			if (cflag == CFLAG_BOTH) {
@@ -927,12 +928,13 @@ main(int argc, char *argv[])
 			}
 			break;
     case 'j':
-      if (optarg) {
-        server_and_port = strdup(optarg);
-        server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
-        server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);
-        send_json = 1;
-      } 
+      server_and_port = strdup(optarg);
+      server_host = strsep(&server_and_port, SERVER_PORT_DELIMITER);
+      server_port = strsep(&server_and_port, SERVER_PORT_DELIMITER);
+      send_json = 1;
+      output_json = 1;
+      break;
+    case 'J':
       output_json = 1;
       break;
 		default:

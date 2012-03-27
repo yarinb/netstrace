@@ -2432,17 +2432,17 @@ trace_syscall_exiting(struct tcb *tcp)
 		return 0;
 	}
 
-	/* if (tcp->flags & TCB_REPRINT) { */
-	/* 	printleader(tcp); */
-	/* 	tprintf("<... "); */
-	/* 	if (scno_good != 1) */
-	/* 		tprintf("????"); */
-	/* 	else if (tcp->scno >= nsyscalls || tcp->scno < 0) */
-	/* 		tprintf("syscall_%lu", tcp->scno); */
-	/* 	else */
-	/* 		tprintf("%s", sysent[tcp->scno].sys_name); */
-	/* 	tprintf(" resumed> "); */
-	/* } */
+	if (tcp->flags & TCB_REPRINT) {
+		printleader(tcp);
+		tprintf("<... ");
+		if (scno_good != 1)
+			tprintf("????");
+		else if (tcp->scno >= nsyscalls || tcp->scno < 0)
+			tprintf("syscall_%lu", tcp->scno);
+		else
+			tprintf("%s", sysent[tcp->scno].sys_name);
+		tprintf(" resumed> ");
+	}
 
 	if (cflag) {
 		struct timeval t = tv;
@@ -2741,34 +2741,38 @@ trace_syscall_entering(struct tcb *tcp)
 	printleader(tcp);
 	tcp->flags &= ~TCB_REPRINT;
 	tcp_last = tcp;
-	if (tcp->scno <= nsyscalls && tcp->scno > 0) {
+  if (tcp->scno >= nsyscalls || tcp->scno < 0) {
+    tprintf("syscall_%lu(", tcp->scno);
+
+  } else {
+    tprintf("%s(", sysent[tcp->scno].sys_name);
     /* yarinb - syscall name prefix print is here
      * send(
      * connect(
      * recv(
      * etc.
      */
-    struct json_object *syscall_json;
-    syscall_json = json_object_new_string(sysent[tcp->scno].sys_name);
-    json_object_object_add(tcp->json, "syscall", syscall_json);
-   
-		tprintf("%s(", sysent[tcp->scno].sys_name);
+    if (output_json) {
+      struct json_object *syscall_json;
+      syscall_json = json_object_new_string(sysent[tcp->scno].sys_name);
+      json_object_object_add(tcp->json, "syscall", syscall_json);
+    }
   }
-	if (tcp->scno >= nsyscalls || tcp->scno < 0 ||
-	    ((qual_flags[tcp->scno] & QUAL_RAW) &&
-	     sysent[tcp->scno].sys_func != sys_exit))
-		sys_res = printargs(tcp);
-	else
+  if (tcp->scno >= nsyscalls || tcp->scno < 0 ||
+      ((qual_flags[tcp->scno] & QUAL_RAW) &&
+       sysent[tcp->scno].sys_func != sys_exit))
+    sys_res = printargs(tcp);
+  else
     /* yarinb - each syscall argument print function
      * is called here */
-		sys_res = (*sysent[tcp->scno].sys_func)(tcp);
-	if (fflush(tcp->outf) == EOF)
-		return -1;
-	tcp->flags |= TCB_INSYSCALL;
-	/* Measure the entrance time as late as possible to avoid errors. */
-	if (dtime || cflag) 
-		gettimeofday(&tcp->etime, NULL);
-	return sys_res;
+    sys_res = (*sysent[tcp->scno].sys_func)(tcp);
+  if (fflush(tcp->outf) == EOF)
+    return -1;
+  tcp->flags |= TCB_INSYSCALL;
+  /* Measure the entrance time as late as possible to avoid errors. */
+  if (dtime || cflag) 
+    gettimeofday(&tcp->etime, NULL);
+  return sys_res;
 }
 
 int

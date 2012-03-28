@@ -2809,8 +2809,8 @@ void append_to_json(struct json_object *json, struct socket_info *sockinfo)
   json_object_object_add(json, "pid", 
       json_object_new_int(sockinfo->pid));
 
-  json_object_object_add(json, "fd", 
-      json_object_new_int(sockinfo->fd));
+  /* json_object_object_add(json, "fd", */
+  /*     json_object_new_int(sockinfo->fd)); */
 }
 
 int send_queue(struct json_list *q)

@@ -55,6 +55,7 @@ sys_read(struct tcb *tcp)
 {
   struct socket_info sockinfo;
   if (entering(tcp)) {
+    json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
     printfd(tcp, tcp->u_arg[0]);
     tprintf(", ");
     if (output_json) {
@@ -65,12 +66,12 @@ sys_read(struct tcb *tcp)
       }
     }
   } else {
+    /* exiting... */
     if (syserror(tcp)) {
       	tprintf("%#lx", tcp->u_arg[1]);
     } else {
+      /* no error */
       if (output_json) {
-        json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
-
         json_object_object_add(tcp->json, "content",
             json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
       } else {

@@ -17,7 +17,7 @@
 
 struct socket_info {
 	pid_t pid;
-	int fd;
+	/* int fd; */
   char laddress[128];     /* local socket address */
   int lport;          /* local socket port */
   char raddress[128];     /* remote socket address */

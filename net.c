@@ -1223,7 +1223,6 @@ struct fd_node *fd_cache_add(pid_t pid, int fd, struct socket_info *sockinfo)
   /* remove existing element... */
   for (fdnp=fd_node_cache+hi;(fdn=*fdnp);fdnp=&fdn->next) {
     if (fdn->pid==pid && fdn->fd == fd) {
-      printf("Should remove entry\n");
       free(fdn->sockinfo);
       fdn->sockinfo = (struct socket_info *) malloc(sizeof(struct socket_info));
       memcpy(fdn->sockinfo, sockinfo, sizeof(*fdn->sockinfo));
@@ -1236,6 +1235,7 @@ struct fd_node *fd_cache_add(pid_t pid, int fd, struct socket_info *sockinfo)
   fdn->next=NULL;
   fdn->fd=fd;
   fdn->sockinfo = (struct socket_info *) malloc(sizeof(struct socket_info));
+
   memcpy(fdn->sockinfo, sockinfo, sizeof(*fdn->sockinfo));
   fdn->pid=pid;
 
@@ -1272,6 +1272,7 @@ int get_socket_info(pid_t pid, int fd, struct socket_info *sockinfo)
       return 1;
     }
     sockinfo->pid = pid;
+    printf("Adding to cache %d\n", fd);
     fd_node = fd_cache_add(pid, fd, sockinfo);
     return 0;
 }
@@ -1681,7 +1682,7 @@ struct tcb *tcp;
 		getsockaddr(tcp, tcp->u_arg[1], tcp->u_arg[2], sa);
     if ((ap = get_afntype(sa->sa_family)) != NULL) {
       sockinfo.pid = tcp->pid;
-      sockinfo.fd = (int) tcp->u_arg[0];
+      /* sockinfo.fd = (int) tcp->u_arg[0]; */
       switch (ap->af) {
         case AF_INET:
           sockinfo.sa_family = AF_INET;
@@ -1707,10 +1708,12 @@ struct tcb *tcp;
     /* add to cache */
     if (handle_call) {
       /* printf("ADDING TO CACHE... %s\n", sockinfo.raddress); */
-      fd_cache_add(tcp->pid, tcp->u_arg[0], &sockinfo);
+      fd_cache_add(tcp->pid, (int) tcp->u_arg[0], &sockinfo);
 
       /* append to json object */
       append_to_json(tcp->json, &sockinfo);
+      json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
+
     }
 
 		/* tprintf("%ld, ", tcp->u_arg[0]); */

@@ -311,6 +311,8 @@ sys_writev(struct tcb *tcp)
 {
   struct socket_info sockinfo;
   char *strings[100];
+
+  char *buf = NULL;
   int i;
   int size;
   if (entering(tcp)) {
@@ -322,17 +324,19 @@ sys_writev(struct tcb *tcp)
       if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
         append_to_json(tcp->json, &sockinfo);
       } else {
-
         json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
       }
+      json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
       size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
       for (i = 0; i< size; i++) {
-        json_object_object_add(tcp->json, "fd",
-            json_object_new_int(tcp->u_arg[0]));
-
-        json_object_object_add(tcp->json, "content",
-            json_object_new_string(strings[i]));
+        buf = (char *)realloc(buf, sizeof(buf) + strlen(strings[i]) +1);
+        buf[0] = '\0';
+        strncat(buf, strings[i], strlen(strings[i]+1));
         free(strings[i]);
+      }
+      if (buf) {
+        json_object_object_add(tcp->json, "content", json_object_new_string(buf));
+        free(buf);
       }
     }
     tprintf(", %lu", tcp->u_arg[2]);

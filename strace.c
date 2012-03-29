@@ -2823,7 +2823,7 @@ int send_queue(struct json_list *q)
   if (sockfd == 0) {
     if ((sockfd = server_connect(server_host, server_port)) <= 0) {
       tprintf("Failed connecting to server %s:%s\n", server_host, server_port);
-      return -1;
+      exit(127);
     }
   }
   while (q->head) {

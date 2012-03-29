@@ -1909,6 +1909,7 @@ sys_recvfrom(tcp)
 struct tcb *tcp;
 {
 	int fromlen;
+  struct socket_info sockinfo;
 
 	if (entering(tcp)) {
 		tprintf("%ld, ", tcp->u_arg[0]);
@@ -1919,6 +1920,14 @@ struct tcb *tcp;
 				tcp->u_arg[4], tcp->u_arg[5]);
 			return 0;
 		}
+    if (output_json) {
+      if (create_sockinfo(tcp, tcp->u_arg[4], tcp->u_arg[5], &sockinfo)) {
+        json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
+        json_object_object_add(tcp->json, "content",
+            json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_rval)));
+        append_to_json(tcp->json, &sockinfo);
+      }
+    }
 		/* buf */
 		printstr(tcp, tcp->u_arg[1], tcp->u_rval);
 		/* len */

@@ -1789,6 +1789,7 @@ sys_send(tcp)
 struct tcb *tcp;
 {
   struct socket_info sockinfo;
+  char *buf;
   if (entering(tcp)) {
 		tprintf("%ld, ", tcp->u_arg[0]);
     if (output_json) {
@@ -1797,7 +1798,8 @@ struct tcb *tcp;
       }
 
       json_object_object_add(tcp->json, "content",
-          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2],buf)));
+      free(buf);
     } else {
       printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
       tprintf(", %lu, ", tcp->u_arg[2]);
@@ -1850,6 +1852,7 @@ sys_recv(tcp)
 struct tcb *tcp;
 {
   struct socket_info sockinfo;
+  char *buf;
   if (entering(tcp)) {
     if (output_json) {
       if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
@@ -1861,24 +1864,22 @@ struct tcb *tcp;
       tprintf("%ld, ", tcp->u_arg[0]);
     }
   } else {
-		if (syserror(tcp)) {
-		  tprintf(", %lu, ", tcp->u_arg[2]);
+    if (syserror(tcp)) {
+      tprintf(", %lu, ", tcp->u_arg[2]);
     } else {
       if (output_json) {
-			json_object_object_add(tcp->json, "fd",
-					json_object_new_int(tcp->u_arg[0]));
-
-    json_object_object_add(tcp->json, "content",
-          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+        json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
+        json_object_object_add(tcp->json, "content", json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_rval, buf)));
       } else {
         printstr(tcp, tcp->u_arg[1], tcp->u_rval);
       }
-		}
+    }
 
-		tprintf(", %lu, ", tcp->u_arg[2]);
-		printflags(msg_flags, tcp->u_arg[3], "MSG_???");
-	}
-	return 0;
+    tprintf(", %lu, ", tcp->u_arg[2]);
+    printflags(msg_flags, tcp->u_arg[3], "MSG_???");
+  }
+  free(buf);
+  return 0;
 }
 
 int

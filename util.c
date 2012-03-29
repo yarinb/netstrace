@@ -646,7 +646,6 @@ string_quote(const char *instr, char *outstr, int len, int size)
 	/* Return nonzero if the string was unterminated.  */
 	return i == size;
 }
-
 /*
  * Print path string specified by address `addr' and length `n'.
  * If path length exceeds `n', append `...' to the output.
@@ -693,12 +692,13 @@ printpath(struct tcb *tcp, long addr)
  * If string length exceeds `max_strlen', append `...' to the output.
  */
 char *
-readstr(struct tcb *tcp, long addr, int len)
+readstr(struct tcb *tcp, long addr, int len, char *buf)
 {
 	static char *str = NULL;
 	static char *outstr;
 	int size;
 
+		buf = malloc(4 * max_strlen + sizeof "\"...\"");
 	if (!addr) {
 		tprintf("NULL");
 		return NULL;
@@ -710,8 +710,8 @@ readstr(struct tcb *tcp, long addr, int len)
 		outstr = malloc(4 * max_strlen + sizeof "\"...\"");
 	if (!str || !outstr) {
 		fprintf(stderr, "out of memory\n");
-		/* tprintf("%#lx", addr); */
-    return NULL;
+		tprintf("%#lx", addr);
+		return NULL;
 	}
 
 	if (len < 0) {
@@ -722,42 +722,42 @@ readstr(struct tcb *tcp, long addr, int len)
 		size = max_strlen + 1;
 		str[max_strlen] = '\0';
 		if (umovestr(tcp, addr, size, str) < 0) {
-			/* tprintf("%#lx", addr); */
-    return NULL;
-	
+			tprintf("%#lx", addr);
+			return NULL;
 		}
 	}
 	else {
 		size = MIN(len, max_strlen);
 		if (umoven(tcp, addr, size, str) < 0) {
-			/* tprintf("%#lx", addr); */
+			tprintf("%#lx", addr);
 			return NULL;
 		}
 	}
 
-	if (string_hexify(str, outstr, len, size) && (len < 0 || len > max_strlen))
+  printf("RAW STR: <s>%s</s>\n", str);
+	if (string_quote(str, outstr, len, size) && (len < 0 || len > max_strlen))
 		strcat(outstr, "...");
 
-  return outstr;
+  printf("QUOTED STR: <s>%s</s>\n", outstr);
+
+  buf = strdup(outstr);
+	tprintf("%s", outstr);
+  return buf;
 }
 
-char *
+
+void
 printstr(struct tcb *tcp, long addr, int len)
 {
 	static char *str = NULL;
 	static char *outstr;
-  static char *empty = NULL;
 	int size;
 
 	if (!addr) {
 		tprintf("NULL");
-		return empty;
+		return;
 	}
 	/* Allocate static buffers if they are not allocated yet. */
-  if (!empty) {
-    empty = malloc(1);
-    snprintf(empty, 1, "");
-  }
 	if (!str)
 		str = malloc(max_strlen + 1);
 	if (!outstr)
@@ -765,7 +765,7 @@ printstr(struct tcb *tcp, long addr, int len)
 	if (!str || !outstr) {
 		fprintf(stderr, "out of memory\n");
 		tprintf("%#lx", addr);
-		return empty;
+		return;
 	}
 
 	if (len < 0) {
@@ -777,23 +777,24 @@ printstr(struct tcb *tcp, long addr, int len)
 		str[max_strlen] = '\0';
 		if (umovestr(tcp, addr, size, str) < 0) {
 			tprintf("%#lx", addr);
-		return empty;
+			return;
 		}
 	}
 	else {
 		size = MIN(len, max_strlen);
 		if (umoven(tcp, addr, size, str) < 0) {
 			tprintf("%#lx", addr);
-		return empty;
+			return;
 		}
 	}
 
+  printf("RAW STR: <s>%s</s>\n", str);
 	if (string_quote(str, outstr, len, size) &&
 	    (len < 0 || len > max_strlen))
 		strcat(outstr, "...");
 
-  tprintf("%s", outstr);
-  return outstr;
+  printf("QUOTED STR: <s>%s</s>\n", outstr);
+	tprintf("%s", outstr);
 }
 
 #if HAVE_SYS_UIO_H

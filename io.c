@@ -54,6 +54,7 @@ int
 sys_read(struct tcb *tcp)
 {
   struct socket_info sockinfo;
+  char *buf;
   if (entering(tcp)) {
     json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
     printfd(tcp, tcp->u_arg[0]);
@@ -73,7 +74,8 @@ sys_read(struct tcb *tcp)
       /* no error */
       if (output_json) {
         json_object_object_add(tcp->json, "content",
-            json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+            json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2], buf)));
+        free(buf);
       } else {
         printstr(tcp, tcp->u_arg[1], tcp->u_rval);
       }
@@ -87,6 +89,7 @@ int
 sys_write(struct tcb *tcp)
 {
   struct socket_info sockinfo;
+  char *buf;
 	if (entering(tcp)) {
     if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
       append_to_json(tcp->json, &sockinfo);
@@ -97,7 +100,8 @@ sys_write(struct tcb *tcp)
 					json_object_new_int(tcp->u_arg[0]));
 
     json_object_object_add(tcp->json, "content",
-          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2], buf)));
+    free(buf);
 		printfd(tcp, tcp->u_arg[0]);
 		tprintf(", ");
 		printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
@@ -115,6 +119,7 @@ unsigned long addr;
 char **result;
 {
 
+  char *buf;
   char *strp;
 	char **resp = result;
 	int count = 0, leng = 0;
@@ -174,10 +179,11 @@ char **result;
 			break;
 		}
 		/* tprintf("{"); */
-		strp = readstr(tcp, (long) iov_iov_base, iov_iov_len);
+		strp = readstr(tcp, (long) iov_iov_base, iov_iov_len, buf);
     leng = strlen(strp);
     *resp = (char *) malloc(sizeof(char) * leng + 1);
     strncpy(*resp, strp, leng+1);
+    free(buf);
 
     /* increment result pointer to next array index */
     resp++;

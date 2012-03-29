@@ -348,6 +348,7 @@ extern int mp_ioctl (int f, int c, void *a, int s);
 /* Trace Control Block */
 struct tcb {
   struct json_object *json;
+  int skip; /* should we skip print of this syscall */
 	short flags;		/* See below for TCB_ values */
 	int pid;		/* Process Id of this entry */
 	long scno;		/* System call number */

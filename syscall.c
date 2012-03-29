@@ -2582,7 +2582,7 @@ trace_syscall_exiting(struct tcb *tcp)
     json_object_object_add(tcp->json, "duration", json_object_new_string(tv_duration_str));
   }
 
-  if (output_json) {
+  if (output_json && !tcp->skip) {
     jprintf("%s\n", json_object_to_json_string(tcp->json));
   }
   printtrailer();
@@ -2592,7 +2592,9 @@ trace_syscall_exiting(struct tcb *tcp)
     return -1;
   tcp->flags &= ~TCB_INSYSCALL;
 
-	submit(tcp->json);
+  if (!tcp->skip) {
+    submit(tcp->json);
+  }
   /* yarinb - free syscall json obj */
   json_object_put(tcp->json);
 	return 0;
@@ -2605,6 +2607,7 @@ trace_syscall_entering(struct tcb *tcp)
 	int res, scno_good;
 
 	scno_good = res = get_scno(tcp);
+  tcp->skip = 0;
   tcp->json = json_object_new_object();
 
 

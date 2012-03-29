@@ -1204,7 +1204,7 @@ static const struct xlat af_packet_types[] = {
 #define PRIME 4723
 #define FD_NODE_HASHIT(x,y) ((((x) * PRIME) + ((y) * PRIME)) % FD_NODE_HASH_SIZE)
 
-static int fd_cache_loaded = 0;
+/* static int fd_cache_loaded = 0; */
 
 struct fd_node {
   struct fd_node *next;
@@ -1277,6 +1277,50 @@ int get_socket_info(pid_t pid, int fd, struct socket_info *sockinfo)
     return 0;
 }
 
+int create_sockinfo(struct tcb *tcp, long addr, int addrlen, struct socket_info *sockinfo)
+{
+
+  struct aftype *ap;
+  struct sockaddr *sa;
+  struct sockaddr_in *sin;
+  struct sockaddr_un *sun;
+  struct sockaddr_in6 *sin6;
+  sockinfo->raddress[0] = '\0';
+  sockinfo->laddress[0] = '\0';
+  sockinfo->rport = 0;
+  sockinfo->lport = 0;
+  int handle_call = 0;
+
+
+  sa = (struct sockaddr *) malloc(128);
+  getsockaddr(tcp, addr, addrlen, sa);
+  if ((ap = get_afntype(sa->sa_family)) != NULL) {
+    sockinfo->pid = tcp->pid;
+    /* sockinfo.fd = (int) tcp->u_arg[0]; */
+    switch (ap->af) {
+      case AF_INET:
+        sockinfo->sa_family = AF_INET;
+        handle_call = 1;
+        sin = ((struct sockaddr_in *)sa);
+        strncpy(sockinfo->raddress, inet_ntoa(sin->sin_addr), 128);
+        sockinfo->rport = ntohs(sin->sin_port);
+        break;
+      case AF_INET6:
+        sockinfo->sa_family = AF_INET6;
+        handle_call = 1;
+        sin6 = ((struct sockaddr_in6 *)sa);
+        break;
+      case AF_UNIX:
+        handle_call = 1;
+        sun = ((struct sockaddr_un *)sa);
+        strncpy(sockinfo->sun_path, sun->sun_path, 108 /* see sockaddr_un */); 
+        sockinfo->sa_family = AF_UNIX;
+        break;
+    }
+
+  }
+  return handle_call;
+}
 void getsockaddr(struct tcb *tcp, long addr, int addrlen, struct sockaddr *sa)
 {
 	union {
@@ -1665,60 +1709,26 @@ int
 sys_bind(tcp)
 struct tcb *tcp;
 {
-  struct aftype *ap;
-  struct sockaddr *sa;
-  struct sockaddr_in *sin;
-  struct sockaddr_un *sun;
-  struct sockaddr_in6 *sin6;
   struct socket_info sockinfo;
 
-  sockinfo.raddress[0] = '\0';
-  sockinfo.laddress[0] = '\0';
-  sockinfo.rport = 0;
-  sockinfo.lport = 0;
-  int handle_call = 0;
 	if (entering(tcp)) {
-    sa = (struct sockaddr *) malloc(128);
-		getsockaddr(tcp, tcp->u_arg[1], tcp->u_arg[2], sa);
-    if ((ap = get_afntype(sa->sa_family)) != NULL) {
-      sockinfo.pid = tcp->pid;
-      /* sockinfo.fd = (int) tcp->u_arg[0]; */
-      switch (ap->af) {
-        case AF_INET:
-          sockinfo.sa_family = AF_INET;
-          handle_call = 1;
-          sin = ((struct sockaddr_in *)sa);
-          strncpy(sockinfo.raddress, inet_ntoa(sin->sin_addr), 128);
-          sockinfo.rport = ntohs(sin->sin_port);
-          break;
-        case AF_INET6:
-          sockinfo.sa_family = AF_INET6;
-          handle_call = 1;
-          sin6 = ((struct sockaddr_in6 *)sa);
-          break;
-        case AF_UNIX:
-          handle_call = 1;
-          sun = ((struct sockaddr_un *)sa);
-          strncpy(sockinfo.sun_path, sun->sun_path, 108 /* see sockaddr_un */); 
-          sockinfo.sa_family = AF_UNIX;
-          break;
-      }
-
-    }
     /* add to cache */
-    if (handle_call) {
-      /* printf("ADDING TO CACHE... %s\n", sockinfo.raddress); */
-      fd_cache_add(tcp->pid, (int) tcp->u_arg[0], &sockinfo);
+    if (output_json) {
+      if (create_sockinfo(tcp, tcp->u_arg[1], tcp->u_arg[2], &sockinfo)) {
+        /* printf("ADDING TO CACHE... %s\n", sockinfo.raddress); */
+        fd_cache_add(tcp->pid, (int) tcp->u_arg[0], &sockinfo);
 
-      /* append to json object */
-      append_to_json(tcp->json, &sockinfo);
-      json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
-
+        /* append to json object */
+        append_to_json(tcp->json, &sockinfo);
+        json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
+      } else {
+        tcp->skip = 1;
+      }
     }
 
-		/* tprintf("%ld, ", tcp->u_arg[0]); */
+		tprintf("%ld, ", tcp->u_arg[0]);
 		printsock(tcp, tcp->u_arg[1], tcp->u_arg[2]);
-		/* tprintf(", %lu", tcp->u_arg[2]); */
+		tprintf(", %lu", tcp->u_arg[2]);
 
 	}
 	return 0;
@@ -1813,19 +1823,32 @@ int
 sys_sendto(tcp)
 struct tcb *tcp;
 {
-	if (entering(tcp)) {
-		tprintf("%ld, ", tcp->u_arg[0]);
-		printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
-		tprintf(", %lu, ", tcp->u_arg[2]);
-		/* flags */
-		printflags(msg_flags, tcp->u_arg[3], "MSG_???");
-		/* to address */
-		tprintf(", ");
-		printsock(tcp, tcp->u_arg[4], tcp->u_arg[5]);
-		/* to length */
-		tprintf(", %lu", tcp->u_arg[5]);
-	}
-	return 0;
+  struct socket_info sockinfo;
+
+  if (entering(tcp)) {
+    if (output_json) {
+      if (create_sockinfo(tcp, tcp->u_arg[4], tcp->u_arg[5], &sockinfo)) {
+
+        /* append to json object */
+        append_to_json(tcp->json, &sockinfo);
+        json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
+        json_object_object_add(tcp->json, "content",
+            json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+
+      }
+    }
+    tprintf("%ld, ", tcp->u_arg[0]);
+    printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
+    tprintf(", %lu, ", tcp->u_arg[2]);
+    /* flags */
+    printflags(msg_flags, tcp->u_arg[3], "MSG_???");
+    /* to address */
+    tprintf(", ");
+    printsock(tcp, tcp->u_arg[4], tcp->u_arg[5]);
+    /* to length */
+    tprintf(", %lu", tcp->u_arg[5]);
+  }
+  return 0;
 }
 
 #ifdef HAVE_SENDMSG

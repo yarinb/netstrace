@@ -1277,6 +1277,7 @@ int get_socket_info(pid_t pid, int fd, struct socket_info *sockinfo)
     return 0;
 }
 
+void getsockaddr(struct tcb *tcp, long addr, int addrlen, struct sockaddr *sa);
 int create_sockinfo(struct tcb *tcp, long addr, int addrlen, struct socket_info *sockinfo)
 {
 
@@ -1875,6 +1876,9 @@ struct tcb *tcp;
 {
   struct socket_info sockinfo;
   if (entering(tcp)) {
+      if (output_json) {
+			  json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
+      }
     if (output_json) {
       if (get_socket_info(tcp->pid, (int) tcp->u_arg[0], &sockinfo) == 0) {
         append_to_json(tcp->json, &sockinfo);
@@ -1885,22 +1889,21 @@ struct tcb *tcp;
       tprintf("%ld, ", tcp->u_arg[0]);
     }
   } else {
-		if (syserror(tcp)) {
-		  tprintf(", %lu, ", tcp->u_arg[2]);
+    if (syserror(tcp)) {
+      tprintf(", %lu, ", tcp->u_arg[2]);
     } else {
       if (output_json) {
-			json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
 
-    json_object_object_add(tcp->json, "content",
-          json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_rval)));
+        json_object_object_add(tcp->json, "content",
+            json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_rval)));
       } else {
         printstr(tcp, tcp->u_arg[1], tcp->u_rval);
       }
-		}
+    }
 
-		tprintf(", %lu, ", tcp->u_arg[2]);
-		printflags(msg_flags, tcp->u_arg[3], "MSG_???");
-	}
+    tprintf(", %lu, ", tcp->u_arg[2]);
+    printflags(msg_flags, tcp->u_arg[3], "MSG_???");
+  }
 	return 0;
 }
 

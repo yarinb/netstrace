@@ -4667,7 +4667,7 @@ if test "${gl_cv_warn__Wall+set}" = set; then :
 else
 
   save_CPPFLAGS="$CPPFLAGS"
-  CPPFLAGS="${CPPFLAGS} -Wall"
+  CPPFLAGS="${CPPFLAGS} -Wall -g"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 

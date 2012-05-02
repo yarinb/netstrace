@@ -87,6 +87,7 @@
 /* yarinb - add json support */
 #include <json.h>
 #include "net-support.h"
+#define MIN(a,b) ((a)>(b)?(b):(a))
 /* accesible submit function */
 extern int submit(struct json_object *json);
 

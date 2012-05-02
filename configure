@@ -4667,7 +4667,7 @@ if test "${gl_cv_warn__Wall+set}" = set; then :
 else
 
   save_CPPFLAGS="$CPPFLAGS"
-  CPPFLAGS="${CPPFLAGS} -Wall -g"
+  CPPFLAGS="${CPPFLAGS} -Wall -ggdb"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -4691,7 +4691,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_warn__Wall" >&5
 $as_echo "$gl_cv_warn__Wall" >&6; }
 if test "x$gl_cv_warn__Wall" = x""yes; then :
-  as_fn_append WARN_CFLAGS " -Wall"
+  as_fn_append WARN_CFLAGS " -Wall -ggdb"
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether compiler handles -Wwrite-strings" >&5

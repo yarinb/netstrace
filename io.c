@@ -276,6 +276,9 @@ sys_readv(struct tcb *tcp)
   int i;
   int size;
   void *lastp = buf;
+  int buf_size = 0;
+  int write_bytes;
+
   if (entering(tcp)) {
     /* printfd(tcp, tcp->u_arg[0]); */
     /* tprintf(", "); */
@@ -293,17 +296,19 @@ sys_readv(struct tcb *tcp)
       if (output_json) {
           json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
         size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
-        buf = (char *) malloc(sizeof(char) * max_strlen * size);
+        buf = (char *) malloc(sizeof(char) * max_strlen);
         for (i = 0; i< size; i++) {
 
           if (i == 0) {
             lastp = (void *) buf;
           }
-          lastp = mempcpy(lastp, strings[i], strlen(strings[i]));
+          write_bytes = MIN(strlen(strings[i]), max_strlen - buf_size);
+          lastp = mempcpy(lastp, strings[i], write_bytes);
+          buf_size += write_bytes;
           free(strings[i]);
         }
         if (buf) {
-          json_object_object_add(tcp->json, "content", json_object_new_string(strings[i]));
+          json_object_object_add(tcp->json, "content", json_object_new_string(buf));
           free(buf);
         }
       }
@@ -317,6 +322,7 @@ sys_readv(struct tcb *tcp)
 int
 sys_writev(struct tcb *tcp)
 {
+
   struct socket_info sockinfo;
   char *strings[100];
 
@@ -324,6 +330,10 @@ sys_writev(struct tcb *tcp)
   void *lastp = (void*) buf;
   int i;
   int size;
+  int buf_size = 0;
+  int bytes_to_write;
+  
+  /* printf("entering writev"); */
   if (entering(tcp)) {
     printfd(tcp, tcp->u_arg[0]);
     tprintf(", ");
@@ -337,14 +347,18 @@ sys_writev(struct tcb *tcp)
       }
       json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
       size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
+      /* printf("readstr_iov size %d maxstrlen %d\n", size, max_strlen); */
 
-
-      buf = (char *) malloc(sizeof(char)*max_strlen*size);
+      
+      buf = (char *) malloc(sizeof(char)*max_strlen);
       for (i = 0; i< size; i++) {
         if (i == 0) {
           lastp = (void *) buf;
         }
-        lastp = mempcpy(lastp, strings[i], strlen(strings[i]));
+        bytes_to_write = MIN(strlen(strings[i]), max_strlen - buf_size);
+        lastp = mempcpy(lastp, strings[i], bytes_to_write);
+        buf_size += bytes_to_write;
+        /* printf("lasp %d\n", &lastp); */
         free(strings[i]);
       }
       if (buf) {

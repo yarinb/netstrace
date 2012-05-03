@@ -87,7 +87,10 @@
 /* yarinb - add json support */
 #include <json.h>
 #include "net-support.h"
+#ifndef MIN
 #define MIN(a,b) ((a)>(b)?(b):(a))
+#endif
+
 /* accesible submit function */
 extern int submit(struct json_object *json);
 
@@ -518,6 +521,7 @@ extern cflag_t cflag;
 extern int acolumn;
 extern unsigned int nprocs, tcbtabsize;
 extern int max_strlen;
+extern int suffix_strlen;
 extern struct tcb *tcp_last;
 
 enum bitness_t { BITNESS_CURRENT = 0, BITNESS_32 };

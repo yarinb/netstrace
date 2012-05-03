@@ -127,6 +127,7 @@ gid_t run_gid;
 
 int acolumn = DEFAULT_ACOLUMN;
 int max_strlen = DEFAULT_STRLEN;
+int suffix_strlen = 10;
 static char *outfname = NULL;
 FILE *outf;
 static int curcol;

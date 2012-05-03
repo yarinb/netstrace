@@ -74,6 +74,7 @@ sys_read(struct tcb *tcp)
       if (output_json) {
         json_object_object_add(tcp->json, "content",
             json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+        json_object_object_add(tcp->json, "length", json_object_new_int(tcp->u_arg[2]));
       } else {
         printstr(tcp, tcp->u_arg[1], tcp->u_rval);
       }
@@ -93,11 +94,12 @@ sys_write(struct tcb *tcp)
 		} else {
 			json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
 		}
-			json_object_object_add(tcp->json, "fd",
-					json_object_new_int(tcp->u_arg[0]));
+    json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
 
     json_object_object_add(tcp->json, "content",
           json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+
+    json_object_object_add(tcp->json, "length", json_object_new_int(tcp->u_arg[2]));
 		printfd(tcp, tcp->u_arg[0]);
 		tprintf(", ");
 		printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
@@ -108,11 +110,12 @@ sys_write(struct tcb *tcp)
 
 #if HAVE_SYS_UIO_H
 int
-readstr_iov(tcp, len, addr, result)
+readstr_iov(tcp, len, addr, result, len_sum)
 struct tcb * tcp;
 unsigned long len;
 unsigned long addr;
 char **result;
+int *len_sum;
 {
 
   char *strp;
@@ -159,6 +162,7 @@ char **result;
 	} else {
 		abbrev_end = end;
 	}
+  *len_sum = 0;
 	/* tprintf("["); */
 	/* resp = (char **) malloc(sizeof(char**) * (end-addr)/sizeof_iov + 1); */
 	for (cur = addr; cur < end; cur += sizeof_iov) {
@@ -179,6 +183,7 @@ char **result;
     *resp = (char *) malloc(sizeof(char) * leng + 1);
     strncpy(*resp, strp, leng+1);
 
+    *len_sum += iov_iov_len;
     /* increment result pointer to next array index */
     resp++;
 		count++;
@@ -273,11 +278,8 @@ sys_readv(struct tcb *tcp)
   struct socket_info sockinfo;
   char *strings[100];
   char *buf = NULL;
-  int i;
-  int size;
+  int i, size, buf_size = 0, write_bytes, len_sum;
   void *lastp = buf;
-  int buf_size = 0;
-  int write_bytes;
 
   if (entering(tcp)) {
     /* printfd(tcp, tcp->u_arg[0]); */
@@ -295,7 +297,7 @@ sys_readv(struct tcb *tcp)
       tprint_iov(tcp, tcp->u_arg[2], tcp->u_arg[1]);
       if (output_json) {
           json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
-        size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
+        size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings, &len_sum);
         buf = (char *) malloc(sizeof(char) * max_strlen);
         for (i = 0; i< size; i++) {
 
@@ -308,7 +310,8 @@ sys_readv(struct tcb *tcp)
           free(strings[i]);
         }
         if (buf) {
-          json_object_object_add(tcp->json, "content", json_object_new_string(buf));
+          json_object_object_add(tcp->json, "content", json_object_new_string_len(buf, buf_size));
+          json_object_object_add(tcp->json, "length", json_object_new_int(len_sum));
           free(buf);
         }
       }
@@ -328,10 +331,8 @@ sys_writev(struct tcb *tcp)
 
   char *buf = NULL;
   void *lastp = (void*) buf;
-  int i;
-  int size;
-  int buf_size = 0;
-  int bytes_to_write;
+  void *writep;
+  int i, size, buf_size = 0, len_sum = 0, write_bytes, len;
   
   /* printf("entering writev"); */
   if (entering(tcp)) {
@@ -346,23 +347,35 @@ sys_writev(struct tcb *tcp)
         json_object_object_add(tcp->json, "pid", json_object_new_int(tcp->pid));
       }
       json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
-      size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings);
+      size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings, &len_sum);
       /* printf("readstr_iov size %d maxstrlen %d\n", size, max_strlen); */
 
-      
-      buf = (char *) malloc(sizeof(char)*max_strlen);
+      buf = (char *) malloc(sizeof(char)*(max_strlen + suffix_strlen + 1));
       for (i = 0; i< size; i++) {
         if (i == 0) {
           lastp = (void *) buf;
         }
-        bytes_to_write = MIN(strlen(strings[i]), max_strlen - buf_size);
-        lastp = mempcpy(lastp, strings[i], bytes_to_write);
-        buf_size += bytes_to_write;
+        if (buf_size < max_strlen) {
+          len = strlen(strings[i]);
+          write_bytes = MIN(strlen(strings[i]), max_strlen - buf_size);
+          lastp = mempcpy(lastp, strings[i], write_bytes);
+          buf_size += write_bytes;
+        } else if (i == size - 1) {
+          // Append the last bytes of the write to the payload if the payload is larger then max_strlen
+          len = strlen(strings[i]);
+          write_bytes = MIN(len, suffix_strlen);
+          writep = len < suffix_strlen ? strings[i] : strings[i] + (len - suffix_strlen);
+          /* printf("adding to the end: %s\n", &writep); */
+          lastp = memcpy(lastp, writep, write_bytes);
+          buf_size += write_bytes;
+        }
         /* printf("lasp %d\n", &lastp); */
         free(strings[i]);
       }
+      /* *((char *)lastp) = 0; */
       if (buf) {
-        json_object_object_add(tcp->json, "content", json_object_new_string(buf));
+        json_object_object_add(tcp->json, "content", json_object_new_string_len(buf, buf_size));
+        json_object_object_add(tcp->json, "length", json_object_new_int(len_sum));
         free(buf);
       }
     }

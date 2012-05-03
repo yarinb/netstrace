@@ -1810,6 +1810,7 @@ struct tcb *tcp;
 
       json_object_object_add(tcp->json, "content",
           json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+      json_object_object_add(tcp->json, "length", json_object_new_int(tcp->u_arg[2]));
     } else {
       printstr(tcp, tcp->u_arg[1], tcp->u_arg[2]);
       tprintf(", %lu, ", tcp->u_arg[2]);
@@ -1835,6 +1836,7 @@ struct tcb *tcp;
         json_object_object_add(tcp->json, "fd", json_object_new_int((int)tcp->u_arg[0]));
         json_object_object_add(tcp->json, "content",
             json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_arg[2])));
+        json_object_object_add(tcp->json, "length", json_object_new_int(tcp->u_arg[2]));
 
       }
     }
@@ -1896,6 +1898,7 @@ struct tcb *tcp;
 
         json_object_object_add(tcp->json, "content",
             json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_rval)));
+        json_object_object_add(tcp->json, "length", json_object_new_int(tcp->u_rval));
       } else {
         printstr(tcp, tcp->u_arg[1], tcp->u_rval);
       }
@@ -1928,6 +1931,7 @@ struct tcb *tcp;
         json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
         json_object_object_add(tcp->json, "content",
             json_object_new_string(readstr(tcp, tcp->u_arg[1], tcp->u_rval)));
+        json_object_object_add(tcp->json, "length", json_object_new_int(tcp->u_rval));
         append_to_json(tcp->json, &sockinfo);
       }
     }

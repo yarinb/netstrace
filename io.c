@@ -348,7 +348,7 @@ sys_writev(struct tcb *tcp)
       }
       json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
       size = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], strings, &len_sum);
-      /* printf("readstr_iov size %d maxstrlen %d\n", size, max_strlen); */
+      printf("readstr_iov size %d len_sum %d\n", size, len_sum); 
 
       buf = (char *) malloc(sizeof(char)*(max_strlen + suffix_strlen + 1));
       for (i = 0; i< size; i++) {
@@ -357,7 +357,8 @@ sys_writev(struct tcb *tcp)
         }
         if (buf_size < max_strlen) {
           len = strlen(strings[i]);
-          write_bytes = MIN(strlen(strings[i]), max_strlen - buf_size);
+        printf("buf_size=%d, len=%d\n", buf_size, len);
+          write_bytes = MIN(len, max_strlen - buf_size);
           lastp = mempcpy(lastp, strings[i], write_bytes);
           buf_size += write_bytes;
         } else if (i == size - 1) {
@@ -365,7 +366,7 @@ sys_writev(struct tcb *tcp)
           len = strlen(strings[i]);
           write_bytes = MIN(len, suffix_strlen);
           writep = len < suffix_strlen ? strings[i] : strings[i] + (len - suffix_strlen);
-          /* printf("adding to the end: %s\n", &writep); */
+          printf("adding to the end: %s\n", writep); 
           lastp = memcpy(lastp, writep, write_bytes);
           buf_size += write_bytes;
         }

@@ -179,14 +179,17 @@ int *buf_size;
 		size = MIN(iov_iov_len, max_strlen - *buf_size);
     if (size > 0) {
       writep = (unsigned long) iov_iov_base;
+      // printf("1) size %lu writep %lu\n", size, writep);
     } else if (max_strlen == *buf_size && cur + sizeof_iov == end) {
       size = MIN(suffix_strlen, iov_iov_len);
       writep = (unsigned long) (iov_iov_len < suffix_strlen ? iov_iov_base : iov_iov_base + (iov_iov_len - suffix_strlen));
+      // printf("2) size %lu writep %lu\n", size, writep);
     }
     if (size > 0) {
       if (umoven(tcp, writep, size, lastp) < 0) {
         return NULL;
       }
+      // printf("lastp = %.*s\n", (int)size, lastp);
       lastp += size;
       *buf_size += size;
     }
@@ -197,7 +200,8 @@ int *buf_size;
   if (!outstr) {
     outstr = (char *) malloc(4 * maxsize);
   }
-	string_hexify(buf, outstr, *buf_size, maxsize);
+  
+	string_hexify(buf, outstr, *buf_size, *buf_size);
 	return outstr;
 #undef sizeof_iov
 #undef iov_iov_base
@@ -302,7 +306,7 @@ sys_readv(struct tcb *tcp)
         json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
         buf = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], &length, &buf_size);
         if (buf) {
-          json_object_object_add(tcp->json, "content", json_object_new_string_len(buf, buf_size));
+          json_object_object_add(tcp->json, "content", json_object_new_string(buf));
           json_object_object_add(tcp->json, "length", json_object_new_int(length));
           free(buf);
         }
@@ -336,7 +340,7 @@ sys_writev(struct tcb *tcp)
       }
       json_object_object_add(tcp->json, "fd", json_object_new_int(tcp->u_arg[0]));
       buf = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], &length, &buf_size);
-      printf("readstr_iov buf_size %d length %d\n", buf_size, length); 
+      printf("readstr_iov buf_size %d iov_length %d strlen %d\n", buf_size, length, strlen(buf)); 
 
       if (buf) {
         json_object_object_add(tcp->json, "content", json_object_new_string(buf));

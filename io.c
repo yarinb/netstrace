@@ -119,7 +119,7 @@ int *buf_size;
 {
 	static char *buf;
   static char *outstr;
-  char *lastp, *writep;
+  char *lastp;
 	int maxsize;
 
 #if defined(LINUX) && SUPPORTED_PERSONALITIES > 1
@@ -142,7 +142,7 @@ int *buf_size;
 #define iov_iov_base iov.iov_base
 #define iov_iov_len iov.iov_len
 #endif
-	unsigned long size, cur, end, abbrev_end;
+	unsigned long size, cur, end, abbrev_end, writep;
 	int failed = 0;
 
   *length = 0;
@@ -176,19 +176,19 @@ int *buf_size;
 			failed = 1;
 			break;
 		}
-		size = MIN(iov_iov_len, max_strlen - buf_size);
+		size = MIN(iov_iov_len, max_strlen - *buf_size);
     if (size > 0) {
-      writep = iov_iov_base;
-    } else if (max_strlen == buf_size && cur + sizeof_iov == end) {
+      writep = (unsigned long) iov_iov_base;
+    } else if (max_strlen == *buf_size && cur + sizeof_iov == end) {
       size = MIN(suffix_strlen, iov_iov_len);
-      writep = iov_iov_len < suffix_strlen ? iov_iov_base : iov_iov_base + (iov_iov_len - suffix_strlen);
+      writep = (unsigned long) (iov_iov_len < suffix_strlen ? iov_iov_base : iov_iov_base + (iov_iov_len - suffix_strlen));
     }
     if (size > 0) {
       if (umoven(tcp, writep, size, lastp) < 0) {
         return NULL;
       }
-      lastp = memcpy(lastp, vbuf, size);
-      buf_size += size;
+      lastp += size;
+      *buf_size += size;
     }
 
     *length += iov_iov_len;
@@ -197,7 +197,7 @@ int *buf_size;
   if (!outstr) {
     outstr = (char *) malloc(4 * maxsize);
   }
-	string_hexify(buf, outstr, buf_size, maxsize);
+	string_hexify(buf, outstr, *buf_size, maxsize);
 	return outstr;
 #undef sizeof_iov
 #undef iov_iov_base
@@ -282,7 +282,7 @@ sys_readv(struct tcb *tcp)
 {
   struct socket_info sockinfo;
   char *buf = NULL;
-  int i, size, buf_size = 0, write_bytes, length;
+  int buf_size = 0, length = 0;
 
   if (entering(tcp)) {
     /* printfd(tcp, tcp->u_arg[0]); */
@@ -320,8 +320,8 @@ sys_writev(struct tcb *tcp)
 
   struct socket_info sockinfo;
   char *buf = NULL;
-  int buf_size = 0, length = 0, write_bytes;
-  
+  int buf_size = 0, length = 0;
+
   /* printf("entering writev"); */
   if (entering(tcp)) {
     printfd(tcp, tcp->u_arg[0]);
@@ -338,31 +338,8 @@ sys_writev(struct tcb *tcp)
       buf = readstr_iov(tcp, tcp->u_arg[2], tcp->u_arg[1], &length, &buf_size);
       printf("readstr_iov buf_size %d length %d\n", buf_size, length); 
 
-      /* for (i = 0; i< size; i++) { */
-      /*   if (i == 0) { */
-      /*     lastp = (void *) buf; */
-      /*   } */
-      /*   if (buf_size < max_strlen) { */
-      /*     len = strlen(strings[i]); */
-      /*   printf("buf_size=%d, len=%d\n", buf_size, len); */
-      /*     write_bytes = MIN(len, max_strlen - buf_size); */
-      /*     lastp = mempcpy(lastp, strings[i], write_bytes); */
-      /*     buf_size += write_bytes; */
-      /*   } else if (i == size - 1) { */
-      /*     // Append the last bytes of the write to the payload if the payload is larger then max_strlen */
-      /*     len = strlen(strings[i]); */
-      /*     write_bytes = MIN(len, suffix_strlen); */
-      /*     writep = len < suffix_strlen ? strings[i] : strings[i] + (len - suffix_strlen); */
-      /*     printf("adding to the end: %s\n", writep); */ 
-      /*     lastp = memcpy(lastp, writep, write_bytes); */
-      /*     buf_size += write_bytes; */
-      /*   } */
-      /*   /1* printf("lasp %d\n", &lastp); *1/ */
-      /*   free(strings[i]); */
-      /* } */
-      /* *((char *)lastp) = 0; */
       if (buf) {
-        json_object_object_add(tcp->json, "content", json_object_new_string_len(buf, buf_size));
+        json_object_object_add(tcp->json, "content", json_object_new_string(buf));
         json_object_object_add(tcp->json, "length", json_object_new_int(length));
         free(buf);
       }

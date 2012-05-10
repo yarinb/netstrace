@@ -558,6 +558,7 @@ extern void dumpiov(struct tcb *, int, long);
 extern void dumpstr(struct tcb *, long, int);
 extern char *printstr(struct tcb *, long, int);
 extern char *readstr(struct tcb *, long, int);
+extern int string_hexify(const char *instr, char *outstr, int len, int size);
 extern void printnum(struct tcb *, long, const char *);
 extern void printnum_int(struct tcb *, long, const char *);
 extern void printpath(struct tcb *, long);

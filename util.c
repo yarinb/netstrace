@@ -432,7 +432,7 @@ unsigned long uid;
 
 static char path[MAXPATHLEN + 1];
 
-static int
+int
 string_hexify(const char *instr, char *outstr, int len, int size)
 {
 	const unsigned char *ustr = (const unsigned char *) instr;

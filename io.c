@@ -179,11 +179,11 @@ int *buf_size;
 		size = MIN(iov_iov_len, max_strlen - *buf_size);
     if (size > 0) {
       writep = (unsigned long) iov_iov_base;
-      // printf("1) size %lu writep %lu\n", size, writep);
+      printf("1) size %lu writep %lu\n", size, writep);
     } else if (max_strlen == *buf_size && cur + sizeof_iov == end) {
       size = MIN(suffix_strlen, iov_iov_len);
       writep = (unsigned long) (iov_iov_len < suffix_strlen ? iov_iov_base : iov_iov_base + (iov_iov_len - suffix_strlen));
-      // printf("2) size %lu writep %lu\n", size, writep);
+      printf("2) size %lu writep %lu\n", size, writep);
     }
     if (size > 0) {
       if (umoven(tcp, writep, size, lastp) < 0) {
@@ -308,7 +308,6 @@ sys_readv(struct tcb *tcp)
         if (buf) {
           json_object_object_add(tcp->json, "content", json_object_new_string(buf));
           json_object_object_add(tcp->json, "length", json_object_new_int(length));
-          free(buf);
         }
       }
     }
@@ -345,7 +344,6 @@ sys_writev(struct tcb *tcp)
       if (buf) {
         json_object_object_add(tcp->json, "content", json_object_new_string(buf));
         json_object_object_add(tcp->json, "length", json_object_new_int(length));
-        free(buf);
       }
     }
     tprintf(", %lu", tcp->u_arg[2]);
